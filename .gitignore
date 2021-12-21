@@ -1,4 +1,11 @@
 .vs
+x64
+
 kdmapper/x64
 kdmapper/kdmapper.vcxproj.user
-x64
+
+client/x64
+client/client.vcxproj.user
+
+driver-loader/x64
+driver-loader/driver-loader.vcxproj.user
