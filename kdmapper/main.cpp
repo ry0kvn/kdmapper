@@ -56,7 +56,7 @@ int wmain(const int argc, wchar_t** argv) {
 	bool free = paramExists(argc, argv, L"free") > 0;
 	bool mdlMode = paramExists(argc, argv, L"mdl") > 0;
 	bool passAllocationPtr = paramExists(argc, argv, L"PassAllocationPtr") > 0;
-
+	
 	if (free) {
 		Log(L"[+] Free pool memory after usage enabled" << std::endl);
 	}
@@ -68,7 +68,7 @@ int wmain(const int argc, wchar_t** argv) {
 	if (passAllocationPtr) {
 		Log(L"[+] Pass Allocation Ptr as first param enabled" << std::endl);
 	}
-
+	
 	int drvIndex = -1;
 	for (int i = 1; i < argc; i++) {
 		if (std::filesystem::path(argv[i]).extension().string().compare(".sys") == 0) {
