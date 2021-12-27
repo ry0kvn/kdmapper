@@ -1,7 +1,7 @@
-#include "pch.hpp"
-#include "main.hpp"
+#include "pch.h"
+#include "kdmapper-ce.hpp"
 
-int main() {
+int wmain(const int argc, wchar_t** argv) {
 	printf("hello\n");
 	return 0;
 }

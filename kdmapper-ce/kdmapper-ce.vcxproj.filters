@@ -5,7 +5,9 @@
     <ClCompile Include="pch.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="main.hpp" />
-    <ClInclude Include="pch.hpp" />
+    <ClInclude Include="kdmapper-ce.hpp" />
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="dbk64_driver_resource.hpp" />
+    <ClInclude Include="kernelmoduleunloader_resource.hpp" />
   </ItemGroup>
 </Project>
