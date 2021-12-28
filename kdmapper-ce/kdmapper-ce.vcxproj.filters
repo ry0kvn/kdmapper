@@ -3,11 +3,13 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="pch.cpp" />
+    <ClCompile Include="utils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="kdmapper-ce.hpp" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="dbk64_driver_resource.hpp" />
     <ClInclude Include="kernelmoduleunloader_resource.hpp" />
+    <ClInclude Include="utils.hpp" />
   </ItemGroup>
 </Project>
