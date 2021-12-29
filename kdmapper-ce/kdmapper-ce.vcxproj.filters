@@ -6,9 +6,10 @@
     <ClCompile Include="utils.cpp" />
     <ClCompile Include="ce_driver.cpp" />
     <ClCompile Include="service.cpp" />
+    <ClCompile Include="kdmapper_ce.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="kdmapper-ce.hpp" />
+    <ClInclude Include="kdmapper_ce.hpp" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="dbk64_driver_resource.hpp" />
     <ClInclude Include="kernelmoduleunloader_resource.hpp" />

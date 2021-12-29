@@ -24,7 +24,7 @@
     <ProjectGuid>{137e5ed4-a847-4b07-b0c6-124d78054482}</ProjectGuid>
     <RootNamespace>shellcode</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <ProjectName>Kernelmoduleunloader</ProjectName>
+    <ProjectName>shellcode</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

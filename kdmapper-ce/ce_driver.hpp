@@ -19,5 +19,5 @@ namespace ce_driver {
 
 	std::wstring GetDriverNameW();
 	std::wstring GetDriverPath();
-	HANDLE Load();
+	BOOL Load();
 }

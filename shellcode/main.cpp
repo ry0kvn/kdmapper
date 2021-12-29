@@ -196,7 +196,7 @@ int main()
     };
     handle_marks mhandle = {
         0x12345678,
-        _CreateFileW(L"\\\\.\\CEDRIVER73 ", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)
+        _CreateFileW(L"\\\\.\\EvilCEDRIVER73", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)
     };
 
     // TODO ìKìñÇ»éûä‘ë“ã@ÅD

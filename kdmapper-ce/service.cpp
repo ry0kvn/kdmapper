@@ -36,12 +36,14 @@ bool service::RegisterAndStart(const std::wstring& driver_path) {
 		Log("[-] Can't create 'Type' registry value");
 		return false;
 	}
+
+	// TODO: ÉåÉWÉXÉgÉäèâä˙âªèàóùÇÕservice.cppÇ∆ce_driver.cppÇ≈ï™ÇØÇÈ
 	/////////////////////////////////////////
 	// Initialize CheatEngine-specific registry.
 	// https://github.com/killswitch-GUI/HotLoad-Driver/blob/master/NtLoadDriver/EXE/NtLoadDriver-C%2B%2B/NtLoadDriver-C%2B%2B.cpp
 	// https://fullpwnops.com/NtLoadDriver/	
-	const std::wstring valeuA = L"\\Device\\CEDRIVER73";
-	const std::wstring valeuB = L"\\DosDevices\\CEDRIVER73";
+	const std::wstring valeuA = L"\\Device\\EvilCEDRIVER73"; // DeviceName
+	const std::wstring valeuB = L"\\DosDevices\\EvilCEDRIVER73"; // SymbolicLinkName
 	const std::wstring valeuC = L"\\BaseNamedObjects\\DBKProcList60";
 	const std::wstring valeuD = L"\\BaseNamedObjects\\DBKThreadList60";
 
@@ -90,7 +92,7 @@ bool service::RegisterAndStart(const std::wstring& driver_path) {
 	}
 	std::wstring ServiceName = ce_driver::GetDriverNameW();
 
-	/// //////////////
+	// TODO: fix
 	typedef NTSTATUS(*myNtLoadDriver)(_In_ PUNICODE_STRING DriverServiceName);
 	auto NtLoadDriver = (myNtLoadDriver)GetProcAddress(ntdll, "NtLoadDriver");
 
@@ -107,39 +109,6 @@ bool service::RegisterAndStart(const std::wstring& driver_path) {
 	if (Status == 0xC000010E) {// STATUS_IMAGE_ALREADY_LOADED
 		return true;
 	}
-	//////////////////
-	/*
-	SC_HANDLE hSCM = OpenSCManager(NULL, NULL, SC_MANAGER_CREATE_SERVICE);
-	if (hSCM == NULL) {
-		return false;
-	}
-
-	SC_HANDLE hService = CreateServiceW(
-		hSCM,           // SCManager database
-		ServiceName.c_str(),   // name of service
-		ServiceName.c_str(),   // name to display
-		SERVICE_ALL_ACCESS,   // desired access
-		SERVICE_KERNEL_DRIVER,// service type
-		SERVICE_DEMAND_START, // start type
-		SERVICE_ERROR_NORMAL, // error control type
-		driver_path.c_str(),     // service's binary
-		NULL,                  // no load ordering group
-		NULL,                  // no tag identifier
-		NULL,                  // no dependencies
-		NULL,          // LocalSystem account
-		NULL         // no password
-	);
-	if (hService == INVALID_HANDLE_VALUE) {
-		Log("[-] Failedd CreateServiceW");
-
-		return false;
-	}
-
-	if (!StartService(hService, NULL, NULL)) {
-		Error("Failed StartService 0x%d", GetLastError());
-		return false;
-	}
-	*/
 
 	return true;
 }
@@ -155,6 +124,8 @@ bool service::StopAndRemove(const std::wstring& driver_name) {
 		PUNICODE_STRING DestinationString,
 		PCWSTR SourceString
 		);
+
+	// TODO: fix
 	my_RtlInitUnicodeString RtlInitUnicodeString = (my_RtlInitUnicodeString)GetProcAddress(ntdll, "RtlInitUnicodeString");
 	RtlInitUnicodeString(&serviceStr, wdriver_reg_path.c_str());
 

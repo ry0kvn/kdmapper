@@ -8,7 +8,7 @@
     <DeploymentDirectory>C:\remotetmp</DeploymentDirectory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <RemoteDebuggerCommand>C:\remotetmp\Kernelmoduleunloader.exe</RemoteDebuggerCommand>
+    <RemoteDebuggerCommand>C:\remotetmp\shellcode.exe</RemoteDebuggerCommand>
     <DebuggerFlavor>WindowsRemoteDebugger</DebuggerFlavor>
     <DeploymentDirectory>C:\remotetmp</DeploymentDirectory>
     <RemoteDebuggerServerName>desktop-ud78o3i</RemoteDebuggerServerName>

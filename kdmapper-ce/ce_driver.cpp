@@ -15,9 +15,12 @@ std::wstring ce_driver::GetDriverPath() {
 	return temp + L"\\" + GetDriverNameW();
 }
 
-HANDLE ce_driver::Load() {
+BOOL ce_driver::Load() {
+	BOOL result = FALSE;
+
 	srand((unsigned)time(NULL) * GetCurrentThreadId());
 	
+	// TODO: check the dbk64.sys service is already running.
 	//if (ce_driver::IsRunning()) {
 	//	Log(L"[-] \\Device\\Nal is already in use." << std::endl);
 	//	return INVALID_HANDLE_VALUE;
@@ -37,48 +40,45 @@ HANDLE ce_driver::Load() {
 	std::wstring driver_path = GetDriverPath();
 	if (driver_path.empty()) {
 		Log("Can't find TEMP folder");
-		return INVALID_HANDLE_VALUE;
+		return result;
 	}
 
 	_wremove(driver_path.c_str());
 
+	// HelloWorld.sys
 	//if (!utils::CreateFileFromMemory(driver_path, reinterpret_cast<const char*>(helloworld_driver_resource::driver), sizeof(helloworld_driver_resource::driver))) {
 	//	Log("Failed to create vulnerable driver file");
 	//	return INVALID_HANDLE_VALUE;
 	//}
+
+	// self compiled dbk64.sys
 	//if (!utils::CreateFileFromMemory(driver_path, reinterpret_cast<const char*>(test_dbk64_driver_resource::driver), sizeof(test_dbk64_driver_resource::driver))) {
 	//	Log("Failed to create vulnerable driver file");
 	//	return INVALID_HANDLE_VALUE;
 	//}
+
+	// dbk64.sys
 	if (!utils::CreateFileFromMemory(driver_path, reinterpret_cast<const char*>(dbk64_driver_resource::driver), sizeof(dbk64_driver_resource::driver))) {
 		Log("Failed to create vulnerable driver file");
-		return INVALID_HANDLE_VALUE;
+		return result;
 	}
 
 	if (!service::RegisterAndStart(driver_path)) {
 		Log("Failed to register and start service for the vulnerable driver");
 		_wremove(driver_path.c_str());
-		return INVALID_HANDLE_VALUE;
+		return result;
 	}
 	Log("Successfully loaded the vulnerable driver");
+	
+	//	HANDLE result = CreateFileW(L"\\\\.\\Nal", GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+		//HANDLE result = CreateFile(L"\\\\.\\CEDRIVER73", GENERIC_READ | GENERIC_WRITE,
+		//	FILE_SHARE_READ |
+		//	FILE_SHARE_WRITE,
+		//	NULL,
+		//	OPEN_EXISTING,
+		//	0,
+		//	NULL);
 
-	if (!service::StopAndRemove(ce_driver::GetDriverNameW())) {
-		Log("Failed to stop and remove service for the vulnerable driver");
-		_wremove(driver_path.c_str());
-		return INVALID_HANDLE_VALUE;
-	}
-
-	Log("Successfully unloaded the vulnerable driver");
-	HANDLE result = INVALID_HANDLE_VALUE;
-
-//	HANDLE result = CreateFileW(L"\\\\.\\Nal", GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	//HANDLE result = CreateFile(L"\\\\.\\CEDRIVER73", GENERIC_READ | GENERIC_WRITE,
-	//	FILE_SHARE_READ |
-	//	FILE_SHARE_WRITE,
-	//	NULL,
-	//	OPEN_EXISTING,
-	//	0,
-	//	NULL);
-
+	result = TRUE;
 	return result;
 }
