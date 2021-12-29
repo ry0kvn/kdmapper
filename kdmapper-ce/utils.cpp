@@ -1,6 +1,7 @@
 #include "utils.hpp"
 
 
+
 void utils::KdmapperInit()
 {
 	// Enable escape sequence
@@ -9,10 +10,37 @@ void utils::KdmapperInit()
 	GetConsoleMode(stdOut, &consoleMode);
 	consoleMode = consoleMode | ENABLE_VIRTUAL_TERMINAL_PROCESSING;
 	SetConsoleMode(stdOut, consoleMode);
+
+
+}
+
+bool utils::CreateFileFromMemory(const std::wstring& desired_file_path, const char* address, size_t size) {
+	std::ofstream file_ofstream(desired_file_path.c_str(), std::ios_base::out | std::ios_base::binary);
+
+	if (!file_ofstream.write(address, size)) {
+		file_ofstream.close();
+		return false;
+	}
+
+	file_ofstream.close();
+	return true;
+}
+
+std::wstring utils::GetFullTempPath() {
+	wchar_t temp_directory[MAX_PATH + 1] = { 0 };
+	const uint32_t get_temp_path_ret = GetTempPathW(sizeof(temp_directory) / 2, temp_directory);
+	if (!get_temp_path_ret || get_temp_path_ret > MAX_PATH + 1) {
+		Log("Failed to get temp path");
+		return L"";
+	}
+	if (temp_directory[wcslen(temp_directory) - 1] == L'\\')
+		temp_directory[wcslen(temp_directory) - 1] = 0x0;
+
+	return std::wstring(temp_directory);
 }
 
 HANDLE utils::ReadFileToMemory(const wchar_t* DriverName) {
-
+	// TODO: ifstreamg‚Á‚Ä‘‚«’¼‚µ
 	HANDLE hFile = CreateFile(
 		DriverName,
 		GENERIC_READ,

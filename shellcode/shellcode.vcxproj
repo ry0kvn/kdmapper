@@ -18,32 +18,13 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="ce_driver.cpp" />
-    <ClCompile Include="main.cpp" />
-    <ClCompile Include="pch.cpp" />
-    <ClCompile Include="service.cpp" />
-    <ClCompile Include="utils.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="ce_driver.hpp" />
-    <ClInclude Include="dbk64_driver_resource.hpp" />
-    <ClInclude Include="helloworld_driver_resource.hpp" />
-    <ClInclude Include="kdmapper-ce.hpp" />
-    <ClInclude Include="kernelmoduleunloader_resource.hpp" />
-    <ClInclude Include="kernelmoduleunloader_sig_resource.hpp" />
-    <ClInclude Include="main.h" />
-    <ClInclude Include="pch.h" />
-    <ClInclude Include="service.hpp" />
-    <ClInclude Include="test_dbk64_driver_resource.hpp" />
-    <ClInclude Include="utils.hpp" />
-  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{8999b748-3f31-494d-958e-41b839ab7e5d}</ProjectGuid>
-    <RootNamespace>kdmapperce</RootNamespace>
+    <ProjectGuid>{137e5ed4-a847-4b07-b0c6-124d78054482}</ProjectGuid>
+    <RootNamespace>shellcode</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>Kernelmoduleunloader</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -158,6 +139,12 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="peb-lookup.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
