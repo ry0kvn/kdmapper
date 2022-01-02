@@ -6,12 +6,14 @@
 
 #include "utils.hpp"
 #include "service.hpp"
-#include "dbk64_driver_resource.hpp"
 
 #if _DEBUG
 #include "helloworld_driver_resource.hpp"
 #include "test_dbk64_driver_resource.hpp"
+#else
+#include "dbk64_driver_resource.hpp"
 #endif
+
 
 
 namespace ce_driver {

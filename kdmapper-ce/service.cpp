@@ -103,13 +103,17 @@ bool service::RegisterAndStart(const std::wstring& driver_path) {
 	RtlInitUnicodeString(&serviceStr, wdriver_reg_path.c_str());
 
 	Status = NtLoadDriver(&serviceStr);
+#ifdef _DEBUG
 	Log("NtLoadDriver Status 0x%x", Status);
+#endif // DEBUG
 
 	//Never should occur since kdmapper checks for "IsRunning" driver before
 	if (Status == 0xC000010E) {// STATUS_IMAGE_ALREADY_LOADED
+		Log("Successfully loaded the vulnerable driver");
 		return true;
 	}
 
+	Log("Successfully loaded the vulnerable driver");
 	return true;
 }
 
@@ -143,8 +147,13 @@ bool service::StopAndRemove(const std::wstring& driver_name) {
 
 	NtUnloadDriver myNtUnloadDriver = (NtUnloadDriver)GetProcAddress(ntdll, "NtUnloadDriver");
 	NTSTATUS st = (NTSTATUS)myNtUnloadDriver(&serviceStr);
-	Log("NtUnloadDriver Status 0x%x",st);
+
 	if (st != 0x0) {
+
+#ifdef _DEBUG
+		Log("NtUnloadDriver Status 0x%x", st);
+#endif // _DEBUG
+
 		Log("Driver Unload Failed!!");
 		status = RegDeleteKeyW(HKEY_LOCAL_MACHINE, servicesPath.c_str());
 		return false; //lets consider unload fail as error because can cause problems with anti cheats later
@@ -155,5 +164,8 @@ bool service::StopAndRemove(const std::wstring& driver_name) {
 	if (status != ERROR_SUCCESS) {
 		return false;
 	}
+
+	Log("Successfully unloaded the vulnerable driver");
+	
 	return true;
 }

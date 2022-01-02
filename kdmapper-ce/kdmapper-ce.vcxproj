@@ -36,6 +36,7 @@
     <ClInclude Include="main.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="service.hpp" />
+    <ClInclude Include="shellcode_resource.hpp" />
     <ClInclude Include="test_dbk64_driver_resource.hpp" />
     <ClInclude Include="utils.hpp" />
   </ItemGroup>

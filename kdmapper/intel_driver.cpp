@@ -343,7 +343,7 @@ bool intel_driver::MmFreePagesFromMdl(HANDLE device_handle, uint64_t MemoryDescr
 	void* result;
 	return CallKernelFunction(device_handle, &result, kernel_MmFreePagesFromMdl, MemoryDescriptorList);
 }
-/**/
+
 
 uint64_t intel_driver::AllocatePool(HANDLE device_handle, nt::POOL_TYPE pool_type, uint64_t size) {
 	if (!size)

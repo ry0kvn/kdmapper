@@ -70,3 +70,17 @@ HANDLE utils::ReadFileToMemory(const wchar_t* DriverName) {
 	CloseHandle(hFile);
 	return hImage;
 }
+
+bool utils::CreateFileToTempFromResource(const wchar_t* file_name, const uint8_t resource_name[], size_t size) {
+	
+	std::wstring SigFilePath = utils::GetFullTempPath() + L"\\" + file_name;
+	
+	_wremove(SigFilePath.c_str());
+
+	if (!utils::CreateFileFromMemory(SigFilePath, reinterpret_cast<const char*>(resource_name), size)) {
+		Error("Failed to create file");
+		return false;
+	}
+
+	return true;
+}

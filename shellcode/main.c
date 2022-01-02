@@ -141,8 +141,23 @@ inline LPVOID get_func_by_name(LPVOID module, char* func_name)
 // It's worth noting that strings can be defined nside the .text section:
 #pragma code_seg(".text")
 
+//__declspec(allocate(".text"))
+//DWORD premark = 0x12345678;
+//
+//__declspec(allocate(".text"))
+//HANDLE handle = NULL;
+//
+//__declspec(allocate(".text"))
+//DWORD postmark = 0x12345678;
+
+
 int main()
 {
+    struct handle_marks {
+    DWORD marks;
+    HANDLE handle;
+    DWORD marks2;
+    } handle_marks = { 0x12345678, NULL, 0x12345678 };
 
     // Init APIs
     // resolve kernel32 image base
@@ -151,7 +166,14 @@ int main()
     char load_lib_name[] = { 'L','o','a','d','L','i','b','r','a','r','y','A',0 };
     char get_proc_name[] = { 'G','e','t','P','r','o','c','A','d','d','r','e','s','s', 0 };
     char create_file_name[] = { 'C', 'r', 'e', 'a', 't', 'e', 'F', 'i', 'l', 'e', 'W', 0 };
+    char virtial_protect_name[] = {'V', 'i', 'r', 't', 'u', 'a', 'l', 'P', 'r', 'o', 't', 'e', 'c', 't', 0};
     char sleep_name[] = { 'S', 'l', 'e', 'e', 'p', 0 };
+    char output_debug_strings[] = {'O', 'u', 't', 'p', 'u', 't', 'D', 'e', 'b', 'u', 'g', 'S', 't', 'r', 'i', 'n', 'g', 'A', 0};
+    char virtual_alloc_name[] = { 'V', 'i', 'r', 't', 'u', 'a', 'l', 'A', 'l', 'l', 'o', 'c', 0 };
+    char write_process_memory_name[] = { 'W', 'r', 'i', 't', 'e', 'P', 'r', 'o', 'c', 'e', 's', 's', 'M', 'e', 'm', 'o', 'r', 'y', 0 };
+    char get_current_process_name[] = {'G', 'e', 't', 'C', 'u', 'r', 'r', 'e', 'n', 't', 'P', 'r', 'o', 'c', 'e', 's', 's', 0};
+    wchar_t symbol_name[] = { '\\', '\\', '.', '\\', 'E', 'v', 'i', 'l', 'C', 'E', 'D', 'R', 'I', 'V', 'E', 'R', '7', '3', 0};
+
 
     // resolve kernel32 image base
     LPVOID base = get_module_by_name((const LPWSTR)kernel32_dll_name);
@@ -168,6 +190,31 @@ int main()
     // getprocaddress function definitions
     FARPROC(WINAPI * _GetProcAddress)(HMODULE hModule, LPCSTR lpProcName)
         = (FARPROC(WINAPI*)(HMODULE, LPCSTR)) get_proc;
+
+
+    BOOL(WINAPI * _OutputDebugStringA)(
+        LPCSTR lpOutputString
+        ) =
+        (BOOL(WINAPI*)(
+            LPCSTR lpOutputString
+            )) _GetProcAddress((HMODULE)base, output_debug_strings);
+
+    _OutputDebugStringA("[+]shellcode Init");
+
+
+    /*BOOL(WINAPI * _VirtualProtect)(
+        _In_  LPVOID lpAddress,
+        _In_  SIZE_T dwSize,
+        _In_  DWORD  flNewProtect,
+         PDWORD lpflOldProtect
+        ) =
+        (BOOL(WINAPI*)(
+            _In_  LPVOID lpAddress,
+            _In_  SIZE_T dwSize,
+            _In_  DWORD  flNewProtect,
+            PDWORD lpflOldProtect
+            )) _GetProcAddress((HMODULE)base, virtial_protect_name);*/
+
 
     HANDLE(WINAPI * _CreateFileW)(
         _In_          LPCWSTR               lpFileName,
@@ -188,17 +235,98 @@ int main()
             _In_opt_ HANDLE                hTemplateFile
             )) _GetProcAddress((HMODULE)base, create_file_name);
 
-    // CreateFile to Open the "\\\\.\\CDRIVER73" handle.
-    //thandle.file_handle =  _CreateFileW(L"\\\\.\\CEDRIVER60", FILE_ANY_ACCESS, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-    struct handle_marks {
-        DWORD marks;
-        HANDLE handle;
-    };
-    handle_marks mhandle = {
-        0x12345678,
-        _CreateFileW(L"\\\\.\\EvilCEDRIVER73", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)
-    };
+    //BOOL bRet = FALSE;
+    //HANDLE hToken = NULL;
+    //LUID luid = { 0 };
 
+    //if (OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES, &hToken))
+    //{
+    //    if (LookupPrivilegeValue(NULL, SE_DEBUG_NAME, &luid))
+    //    {
+    //        TOKEN_PRIVILEGES tokenPriv = { 0 };
+    //        tokenPriv.PrivilegeCount = 1;
+    //        tokenPriv.Privileges[0].Luid = luid;
+    //        tokenPriv.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+
+    //        bRet = AdjustTokenPrivileges(hToken, FALSE, &tokenPriv, sizeof(TOKEN_PRIVILEGES), NULL, NULL);
+    //    }
+    //}  
+    //if (!bRet) {
+    //    printf("RtlAdjustPrivilege failed\n");
+    //    return -1;
+    //}
+
+
+    //DWORD oldProtect = 0;
+    //_VirtualProtect(&handle, sizeof(HANDLE), PAGE_EXECUTE_READWRITE, &oldProtect);
+    //_OutputDebugStringA("[+]shellcode VirtualProtect");
+
+    handle_marks.handle = _CreateFileW(
+        symbol_name,
+        GENERIC_READ | GENERIC_WRITE,
+        FILE_SHARE_READ | FILE_SHARE_WRITE, 
+        NULL, 
+        OPEN_EXISTING, 
+        FILE_ATTRIBUTE_NORMAL, 
+        NULL
+    );
+
+    //HANDLE hDevice = CreateFile(L"\\\\.\\EvilCEDRIVER73", GENERIC_READ| GENERIC_WRITE, FILE_SHARE_WRITE,
+    //    NULL, OPEN_EXISTING, 0, NULL);
+
+    _OutputDebugStringA("[+]shellcode _CreateFileA");
+
+    //_VirtualProtect(&handle, sizeof(HANDLE), oldProtect, 0);
+
+
+
+    LPVOID(WINAPI* _VirtualAlloc)(
+        LPVOID lpAddress,
+        SIZE_T dwSize,
+        DWORD  flAllocationType,
+        DWORD  flProtect
+        ) =
+        (LPVOID(WINAPI*)(
+            LPVOID lpAddress,
+            SIZE_T dwSize,
+            DWORD  flAllocationType,
+            DWORD  flProtect
+            )) _GetProcAddress((HMODULE)base, virtual_alloc_name);
+
+
+    BOOL(WINAPI * _WriteProcessMemory)(
+        HANDLE  hProcess,
+        LPVOID  lpBaseAddress,
+        LPCVOID lpBuffer,
+        SIZE_T  nSize,
+        SIZE_T * lpNumberOfBytesWritten
+        ) =
+        (BOOL(WINAPI*)(
+            HANDLE  hProcess,
+            LPVOID  lpBaseAddress,
+            LPCVOID lpBuffer,
+            SIZE_T  nSize,
+            SIZE_T * lpNumberOfBytesWritten
+            )) _GetProcAddress((HMODULE)base, write_process_memory_name);
+
+    HANDLE(WINAPI * _GetCurrentProcess)(
+        ) =
+        (HANDLE(WINAPI*)(
+            )) _GetProcAddress((HMODULE)base, get_current_process_name);
+
+    struct handle_marks *lpBuffer = _VirtualAlloc(NULL, sizeof(handle_marks), (MEM_RESERVE | MEM_COMMIT), PAGE_READWRITE);
+    
+    _OutputDebugStringA("[+]shellcode _VirtualAlloc");
+
+    _WriteProcessMemory(_GetCurrentProcess(), lpBuffer, &handle_marks, sizeof(handle_marks), NULL);
+
+    _OutputDebugStringA("[+]shellcode _WriteProcessMemory");
+    
+    //printf("Allocated at 0x%x(%d bytes)\n", lpBuffer, sizeof(handle_marks));
+    //printf("original: 0x%x, 0x%x, 0x%x\n", handle_marks.marks, handle_marks.handle, handle_marks.marks2);
+    //printf("copied: 0x%x, 0x%x, 0x%x\n", lpBuffer->marks, lpBuffer->handle, lpBuffer->marks2);
+
+    
     // TODO ìKìñÇ»éûä‘ë“ã@ÅD
     VOID(WINAPI * _Sleep)(
         _In_          DWORD                       dwMilliseconds
@@ -207,7 +335,9 @@ int main()
             _In_          DWORD                       dwMilliseconds
             )) _GetProcAddress((HMODULE)base, sleep_name);
 
-    //   _Sleep(1000*10); // 10s
-    printf("0x%x, 0x%p", mhandle.marks, mhandle.handle);
-    return 0;
+    //printf("EvilCEDRIVER73 handle: %d\n", handle);
+     _Sleep(1000*10); // 10s
+     _OutputDebugStringA("[+]shellcode _Sleep");
+
+     return 0;
 }

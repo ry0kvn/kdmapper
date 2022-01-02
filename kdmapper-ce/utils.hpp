@@ -22,4 +22,5 @@ namespace utils {
 	bool CreateFileFromMemory(const std::wstring& desired_file_path, const char* address, size_t size);
 	void KdmapperInit();
 	HANDLE ReadFileToMemory(const wchar_t* driver_name);
+	bool CreateFileToTempFromResource(const wchar_t* file_name, const uint8_t resource_name[], size_t size);
 }

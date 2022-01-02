@@ -10,3 +10,11 @@ kdmapper-ce/kdmapper.vcxproj.user
 shellcode/x64
 shellcode/shellcode.vcxproj.user
 shellcode/Debug
+/shellcode/shellcode-generator.py
+/shellcode/name-generator.py
+/shellcode/main.obj
+/shellcode/main.exe
+/shellcode/make.bat
+/shellcode/mllink$.lnk
+/shellcode/shellcode-array.c
+/shellcode/main.asm

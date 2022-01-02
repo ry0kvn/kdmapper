@@ -48,14 +48,19 @@ BOOL ce_driver::Load() {
 	// HelloWorld.sys
 	//if (!utils::CreateFileFromMemory(driver_path, reinterpret_cast<const char*>(helloworld_driver_resource::driver), sizeof(helloworld_driver_resource::driver))) {
 	//	Log("Failed to create vulnerable driver file");
-	//	return INVALID_HANDLE_VALUE;
+	//	return result;
 	//}
 
+	
+#ifdef  _DEBUG
+
 	// self compiled dbk64.sys
-	//if (!utils::CreateFileFromMemory(driver_path, reinterpret_cast<const char*>(test_dbk64_driver_resource::driver), sizeof(test_dbk64_driver_resource::driver))) {
-	//	Log("Failed to create vulnerable driver file");
-	//	return INVALID_HANDLE_VALUE;
-	//}
+	if (!utils::CreateFileFromMemory(driver_path, reinterpret_cast<const char*>(test_dbk64_driver_resource::driver), sizeof(test_dbk64_driver_resource::driver))) {
+		Log("Failed to create vulnerable driver file");
+		return result;
+	}
+
+#else
 
 	// dbk64.sys
 	if (!utils::CreateFileFromMemory(driver_path, reinterpret_cast<const char*>(dbk64_driver_resource::driver), sizeof(dbk64_driver_resource::driver))) {
@@ -63,21 +68,15 @@ BOOL ce_driver::Load() {
 		return result;
 	}
 
+#endif //  _DEBUG
+
+
 	if (!service::RegisterAndStart(driver_path)) {
 		Log("Failed to register and start service for the vulnerable driver");
 		_wremove(driver_path.c_str());
 		return result;
 	}
-	Log("Successfully loaded the vulnerable driver");
 	
-	//	HANDLE result = CreateFileW(L"\\\\.\\Nal", GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-		//HANDLE result = CreateFile(L"\\\\.\\CEDRIVER73", GENERIC_READ | GENERIC_WRITE,
-		//	FILE_SHARE_READ |
-		//	FILE_SHARE_WRITE,
-		//	NULL,
-		//	OPEN_EXISTING,
-		//	0,
-		//	NULL);
 
 	result = TRUE;
 	return result;

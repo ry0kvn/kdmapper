@@ -52,6 +52,12 @@ int wmain(const int argc, wchar_t** argv) {
 	}
 		
 	// TODO: DeviceIoControlを使いドライバをロード
+	NTSTATUS exitCode = 0;
+	if (!kdmapper_ce::MapDriver(dbk64_device_handle, hDriver, &exitCode)) {
+		Error("Failed to map %s", DriverName);
+		service::StopAndRemove(ce_driver::GetDriverNameW());
+		return -1;
+	}
 
 	// サービスの停止，削除
 	if (!service::StopAndRemove(ce_driver::GetDriverNameW())) {
@@ -60,8 +66,5 @@ int wmain(const int argc, wchar_t** argv) {
 		return -1;
 	}
 
-	Log("Successfully unloaded the vulnerable driver");
-
-	//getchar();
 	return 0;
 }
