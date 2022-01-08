@@ -277,9 +277,7 @@ int main()
     _OutputDebugStringA("[+]shellcode _CreateFileA");
 
     //_VirtualProtect(&handle, sizeof(HANDLE), oldProtect, 0);
-
-
-
+    
     LPVOID(WINAPI* _VirtualAlloc)(
         LPVOID lpAddress,
         SIZE_T dwSize,

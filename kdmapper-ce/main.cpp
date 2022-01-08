@@ -11,7 +11,6 @@ int wmain(const int argc, wchar_t** argv) {
 
 	wchar_t DriverFullPath[MAX_PATH] = { 0 };
 	const wchar_t* DriverName = argv[1];
-	const wchar_t DeviceName[] = L"\\\\.\\CEDRIVER73";
 	HANDLE hDriver = NULL;
 
 	// コマンドライン引数に与えられたファイルをメモリにロード
@@ -74,6 +73,7 @@ int wmain(const int argc, wchar_t** argv) {
 
 	} while (FALSE);
 
+	getchar();
 
 	// サービスの停止，削除
 	if (!service::StopAndRemove(ce_driver::GetDriverNameW())) {

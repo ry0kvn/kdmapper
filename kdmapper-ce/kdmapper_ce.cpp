@@ -510,7 +510,6 @@ BOOL kdmapper_ce::PatchMajorFunction(HANDLE dbk64_device_handle)
             break;
         }
 
-
         // カーネルモードシェルコードの実行
 
         UINT64 shellcodeAddress = kernelShellcodeBuf;
@@ -519,14 +518,6 @@ BOOL kdmapper_ce::PatchMajorFunction(HANDLE dbk64_device_handle)
             Error("ExecuteKernelModeShellCode failed");
             break;
         }
-
-        // 実行結果の取得
-
-
-        // ローダーコードを配置
-
-
-        // DeviceIoControlを使ってローダーコードと通信し，ドライバをマップ
 
         bRc = TRUE;
 
