@@ -33,8 +33,10 @@
     <ClInclude Include="kdmapper_ce.hpp" />
     <ClInclude Include="kernelmoduleunloader_resource.hpp" />
     <ClInclude Include="kernelmoduleunloader_sig_resource.hpp" />
+    <ClInclude Include="kernel_mode_shellcode_resource.hpp" />
     <ClInclude Include="main.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="resources\dbk64_driver_resource.hpp" />
     <ClInclude Include="service.hpp" />
     <ClInclude Include="shellcode_resource.hpp" />
     <ClInclude Include="test_dbk64_driver_resource.hpp" />

@@ -35,29 +35,45 @@ int wmain(const int argc, wchar_t** argv) {
 		return -1;
 	}
 
-	// dbk64ファイルをディスクにドロップしサービスを作成，開始
-
+	// dbk64.sysファイルをディスクにドロップしサービスを作成，開始
+	// TODO: おそらく削除処理に漏れがある
 	if (!ce_driver::Load()) {
 		Error("ce_driver::Load() failed");
 		return -1;
 	}
 
-	// TODO: kernelmoduleunloaderにシェルコードをインジェクトし，dbk64サービスのハンドルを取得
+	do {
 
-	HANDLE dbk64_device_handle = kdmapper_ce::GetDbk64DeviceHandle();
-	if (dbk64_device_handle == INVALID_HANDLE_VALUE) {
-		service::StopAndRemove(ce_driver::GetDriverNameW());
-		Error("kdmapper_ce::GetDbk64DeviceHandle failed");
-		return -1;
-	}
-		
-	// TODO: DeviceIoControlを使いドライバをロード
-	NTSTATUS exitCode = 0;
-	if (!kdmapper_ce::MapDriver(dbk64_device_handle, hDriver, &exitCode)) {
-		Error("Failed to map %s", DriverName);
-		service::StopAndRemove(ce_driver::GetDriverNameW());
-		return -1;
-	}
+		// kernelmoduleunloaderにシェルコードをインジェクトし，dbk64.sysのデバイスハンドルを取得
+		Log("Injecting shellcode into KernelModuleUnloader.exe process to get device handle of Dbk64.sys...");
+		HANDLE dbk64_device_handle = kdmapper_ce::GetDbk64DeviceHandle();
+		if (dbk64_device_handle == INVALID_HANDLE_VALUE) {
+			Error("kdmapper_ce::GetDbk64DeviceHandle failed");
+			break;
+		}
+
+		// Dbk64.sysのIRP_MJ_DEVICE_CONTROLにパッチを当て，
+		// ドライバをロードする代替コードでフックする
+		Log("Patching IRP_MJ_DEVICE_CONTROL in Dbk64.sys driver to hook IRP...");
+		if (!kdmapper_ce::PatchMajorFunction(dbk64_device_handle)) {
+			Error("kdmapper_ce::PatchMajorFunction failed");
+			break;
+		}
+
+		// TODO: 入力されたドライバのロード
+		Log("Ready, load the input driver...");
+		NTSTATUS exitCode = 0;
+		if (!kdmapper_ce::MapDriver(dbk64_device_handle, hDriver, &exitCode)) {
+			Error("Failed to map %s", DriverName);
+			break;
+		}
+
+#ifdef _DEBUG
+		Log("exitCode: %d", exitCode);
+#endif // _DEBUG
+
+	} while (FALSE);
+
 
 	// サービスの停止，削除
 	if (!service::StopAndRemove(ce_driver::GetDriverNameW())) {

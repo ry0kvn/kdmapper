@@ -21,5 +21,7 @@
     <ClInclude Include="test_dbk64_driver_resource.hpp" />
     <ClInclude Include="kernelmoduleunloader_sig_resource.hpp" />
     <ClInclude Include="shellcode_resource.hpp" />
+    <ClInclude Include="kernel_mode_shellcode_resource.hpp" />
+    <ClInclude Include="resources\dbk64_driver_resource.hpp" />
   </ItemGroup>
 </Project>
