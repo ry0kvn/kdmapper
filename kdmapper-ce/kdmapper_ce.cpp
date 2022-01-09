@@ -255,7 +255,122 @@ HANDLE kdmapper_ce::GetDbk64DeviceHandle()
 
 BOOL kdmapper_ce::MapDriver(HANDLE dbk64_device_handle, HANDLE hDriver, NTSTATUS* exitCode)
 {
-    return FALSE;
+    BOOL status = FALSE;
+    
+    do {
+
+        // DeviceIoControlTest
+#ifdef _DEBUG
+        if (!Dbk64DeviceIoControlTest(dbk64_device_handle)) {
+            Error("DeviceIoControlTest failed");
+            return FALSE;
+        }
+#endif // _DEBUG
+
+        // .sys ファイルをパース
+
+    const PIMAGE_NT_HEADERS64 ntHeaders = portable_executable::GetNtHeaders(hDriver);
+    
+    if (!ntHeaders) {
+        Error("Invalid format of PE image");
+        break;
+    }
+    
+    if (ntHeaders->OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR64_MAGIC) {
+        Error("[-] Image is not 64 bit");
+        break;
+    }
+
+    uint32_t ImageSize = ntHeaders->OptionalHeader.SizeOfImage;
+
+    UINT64 KernelBuf = AllocateNonPagedMem(dbk64_device_handle, ImageSize);
+    if (KernelBuf == NULL) {
+        Error("AllocateNoPagedMem failed");
+        break;
+    }
+
+    Log("Kernel memory has been allocatted at 0x%p", KernelBuf);
+
+    // 上で確保したバッファのMDL を作成し，ユーザー空間からアクセス可能にする
+
+    VOID* SharedBuf = NULL;
+    UINT64 Mdl = NULL;
+
+    if (!CreateSharedMemory(dbk64_device_handle, KernelBuf, (UINT64*)&SharedBuf, &Mdl, ImageSize)) {
+        Error("CreateSharedMemory failed");
+        break;
+    }
+
+    Log("Shared memory has been created in user space at 0x%p (MDL: 0x%p)", SharedBuf, Mdl);
+
+    // Copy image headers
+
+    memcpy(SharedBuf, (BYTE*)hDriver, ntHeaders->OptionalHeader.SizeOfHeaders);
+
+    // Copy image sections
+
+    PIMAGE_SECTION_HEADER section = IMAGE_FIRST_SECTION(ntHeaders);
+    for (auto i = 0; i < ntHeaders->FileHeader.NumberOfSections; i++)
+    {
+        if ((section->Characteristics & IMAGE_SCN_CNT_UNINITIALIZED_DATA) > 0)
+            continue;
+        auto sectionDestination = (LPVOID)((DWORD_PTR)SharedBuf + (DWORD_PTR)section->VirtualAddress);
+        auto sectionBytes = (LPVOID)((DWORD_PTR)hDriver + (DWORD_PTR)section->PointerToRawData);
+        memcpy(sectionDestination, sectionBytes, section->SizeOfRawData);
+        Log("Copy section : SectionCount 0x%d 0x%p ", i, sectionDestination);
+        section++;
+    }
+
+    // Resolve relocs and imports
+    
+    DWORD_PTR deltaImageBase = (DWORD_PTR)KernelBuf - (DWORD_PTR)ntHeaders->OptionalHeader.ImageBase;
+    portable_executable::RelocateImageByDelta(portable_executable::GetRelocs((VOID*)SharedBuf), deltaImageBase);
+
+    if (!ResolveImports(dbk64_device_handle, portable_executable::GetImports(SharedBuf))) {
+        Error("Failed to resolve imports");
+        break;
+    }
+
+    // unmap shared memory
+
+    if (!UnMapSharedMemory(dbk64_device_handle, (UINT64)SharedBuf, Mdl)) {
+        Error("UnMapSharedMemory failed");
+        break;
+    }
+
+    // Call driver entry point
+
+    const uint64_t address_of_entry_point = (uint64_t)KernelBuf + ntHeaders->OptionalHeader.AddressOfEntryPoint;
+
+    Log("Calling DriverEntry 0x%p", address_of_entry_point);
+    if (!kdmapper_ce::CallDriverEntry(dbk64_device_handle, address_of_entry_point)) {
+        Error("Failed to call driver entry");
+        break;
+    }
+        
+    status = TRUE;
+
+    } while (FALSE);
+
+    return status;
+}
+
+bool kdmapper_ce::CallDriverEntry(HANDLE hDevice, UINT64 EntryPoint) {
+
+    auto ioCtlCode = IOCTL_CE_EXECUTE_CODE;
+    DWORD returned;
+
+    struct input
+    {
+        UINT64	functionaddress;
+        UINT64	parameters;
+    }inp = { EntryPoint, NULL };
+
+    if (DeviceIoControl(hDevice, ioCtlCode, &inp, sizeof input, nullptr, 0, &returned, nullptr))
+        return TRUE;
+    else
+        return FALSE;
+
 }
 
 UINT64 kdmapper_ce::AllocateNonPagedMem(HANDLE hDevice,  SIZE_T Size) {
@@ -524,4 +639,43 @@ BOOL kdmapper_ce::PatchMajorFunction(HANDLE dbk64_device_handle)
     } while (false);
 
     return bRc;
+}
+
+bool kdmapper_ce::ResolveImports(HANDLE hDevice, portable_executable::vec_imports imports) {
+    for (const auto& current_import : imports) {
+    
+        /*ULONG64 Module = utils::GetKernelModuleAddress(current_import.module_name);
+        if (!Module) {
+#if !defined(DISABLE_OUTPUT)
+            Log("Dependency %s wasn't found", current_import.module_name);
+#endif
+            return false;
+        }*/
+        for (auto& current_function_data : current_import.function_datas) {
+            //uint64_t function_address = GetKernelModuleExport(hDevice, Module, current_function_data.name);
+            //TODO:
+            // 現状ntoskrnlのみ対応
+            std::wstring function_name(current_function_data.name.begin(), current_function_data.name.end());
+            uint64_t function_address = (uint64_t)GetSystemProcAddress(hDevice, function_name.c_str());
+
+            //uint64_t function_address = MmGetSystemRoutineAddress(hDevice, current_function_data.name);
+            Log("ResolveImports: import %s (0x%p)", current_function_data.name, function_address);
+//            if (!function_address) {
+//                //Lets try with ntoskrnl
+//                if (Module != ntoskrnlAddr) {
+//                    function_address = GetKernelModuleExport(hDevice, ntoskrnlAddr, current_function_data.name);
+//                    if (!function_address) {
+//#if !defined(DISABLE_OUTPUT)
+//                        Log("Failed to resolve import %s (%s)", current_function_data.name, current_import.module_name);
+//#endif
+                        //return false;
+                   // }
+                //}
+            //}
+
+            *current_function_data.address = function_address;
+        }
+    }
+
+    return true;
 }

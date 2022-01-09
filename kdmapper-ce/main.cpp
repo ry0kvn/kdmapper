@@ -53,11 +53,11 @@ int wmain(const int argc, wchar_t** argv) {
 
 		// Dbk64.sysのIRP_MJ_DEVICE_CONTROLにパッチを当て，
 		// ドライバをロードする代替コードでフックする
-		Log("Patching IRP_MJ_DEVICE_CONTROL in Dbk64.sys driver to hook IRP...");
-		if (!kdmapper_ce::PatchMajorFunction(dbk64_device_handle)) {
-			Error("kdmapper_ce::PatchMajorFunction failed");
-			break;
-		}
+		//Log("Patching IRP_MJ_DEVICE_CONTROL in Dbk64.sys driver to hook IRP...");
+		//if (!kdmapper_ce::PatchMajorFunction(dbk64_device_handle)) {
+		//	Error("kdmapper_ce::PatchMajorFunction failed");
+		//	break;
+		//}
 
 		// TODO: 入力されたドライバのロード
 		Log("Ready, load the input driver...");
@@ -73,7 +73,6 @@ int wmain(const int argc, wchar_t** argv) {
 
 	} while (FALSE);
 
-	getchar();
 
 	// サービスの停止，削除
 	if (!service::StopAndRemove(ce_driver::GetDriverNameW())) {

@@ -23,6 +23,7 @@
     <ClCompile Include="kdmapper_ce.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="pch.cpp" />
+    <ClCompile Include="portable_executable.cpp" />
     <ClCompile Include="service.cpp" />
     <ClCompile Include="utils.cpp" />
   </ItemGroup>
@@ -36,6 +37,7 @@
     <ClInclude Include="kernel_mode_shellcode_resource.hpp" />
     <ClInclude Include="main.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="portable_executable.hpp" />
     <ClInclude Include="resources\dbk64_driver_resource.hpp" />
     <ClInclude Include="service.hpp" />
     <ClInclude Include="shellcode_resource.hpp" />

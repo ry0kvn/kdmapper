@@ -7,6 +7,7 @@
     <ClCompile Include="ce_driver.cpp" />
     <ClCompile Include="service.cpp" />
     <ClCompile Include="kdmapper_ce.cpp" />
+    <ClCompile Include="portable_executable.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="kdmapper_ce.hpp" />
@@ -23,5 +24,6 @@
     <ClInclude Include="shellcode_resource.hpp" />
     <ClInclude Include="kernel_mode_shellcode_resource.hpp" />
     <ClInclude Include="resources\dbk64_driver_resource.hpp" />
+    <ClInclude Include="portable_executable.hpp" />
   </ItemGroup>
 </Project>

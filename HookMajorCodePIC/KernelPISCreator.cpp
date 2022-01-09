@@ -26,6 +26,7 @@ typedef NTSTATUS(__stdcall* pObReferenceObjectByName)(__in PUNICODE_STRING Objec
 	__inout_opt PVOID ParseContext,
 	__out PVOID* Object);
 typedef LONG_PTR(__stdcall* pObfDereferenceObject)(_In_  PVOID Object);
+typedef LONG_PTR(__stdcall* pRtlInitUnicodeString)(PUNICODE_STRING  DestinationString, PCWSTR SourceString);
 
 #pragma runtime_checks( "", off )
 #pragma optimize("", off)
@@ -44,7 +45,51 @@ __stdcall MyDispatchIoctlDBVM(IN PDEVICE_OBJECT DeviceObject, ULONG IoControlCod
 	UNREFERENCED_PARAMETER(nOutBufferSize);
 	UNREFERENCED_PARAMETER(lpBytesReturned);
 
-	DbgPrint("Hellor From MyDispatchIoctlDBVM");
+	NTSTATUS ntStatus = STATUS_UNSUCCESSFUL;
+	struct input
+	{
+		UINT64 MmGetSystemRoutineAddressAddress;
+		UINT64 RtlInitUnicodeStringAddress;
+		UINT64 PEPROCESS;
+	} *inp;
+
+	struct output
+	{
+		UINT64 Address;
+	} *outp;
+
+	UNICODE_STRING temp;
+
+	inp = (input*)lpInBuffer;
+	outp = (output*)lpInBuffer;
+
+	pRtlInitUnicodeString rtlInitUnicodeString = (pRtlInitUnicodeString)inp->RtlInitUnicodeStringAddress;
+	rtlInitUnicodeString(&temp, (PCWSTR)inp->PEPROCESS);
+	pMmGetSystemRoutineAddress mmGetSystemRoutineAddress = (pMmGetSystemRoutineAddress)inp->MmGetSystemRoutineAddressAddress;
+	UINT64 funcAddr = (UINT64)mmGetSystemRoutineAddress(&temp);
+
+	WCHAR DbgPrintName[] = { 'D', 'b', 'g', 'P', 'r', 'i', 'n', 't', '\0' };
+	WCHAR erroString[] = { 'f', 'u', 'n', 'c', 'A', 'd', 'd', 'r', '=', '=', 'N', 'U', 'L', 'L', 0 };
+	WCHAR greetingString[] = { 'H', 'e', 'l', 'l', 'o', 'r', ' ', 'F', 'r', 'o', 'm', ' ', 'M', 'y', 'D', 'i', 's', 'p', 'a', 't', 'c', 'h', 'I', 'o', 'c', 't', 'l', 'D', 'B', 'V', 'M', 0 };
+	UNICODE_STRING dbgPrint = RTL_CONSTANT_STRING(DbgPrintName);
+	UNICODE_STRING erro = RTL_CONSTANT_STRING(erroString);
+	UNICODE_STRING greeting = RTL_CONSTANT_STRING(greetingString);
+
+	pDbgPrint myDbgPrint = (pDbgPrint)mmGetSystemRoutineAddress(&dbgPrint);
+
+	if (funcAddr != NULL)
+	{
+		outp->Address = funcAddr;
+		ntStatus = STATUS_SUCCESS;
+	}
+	else
+	{
+		myDbgPrint("%ls", erro);
+		ntStatus = STATUS_UNSUCCESSFUL;
+	}
+
+
+	myDbgPrint("%ls", greeting);
 	
 	return TRUE;
 }
