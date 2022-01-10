@@ -3,6 +3,7 @@ kdmapper/x64
 kdmapper/kdmapper.vcxproj.user
 x64
 Debug
+Release
 
 kdmapper-ce/x64
 kdmapper-ce/kdmapper.vcxproj.user

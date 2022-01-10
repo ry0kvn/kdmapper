@@ -3,9 +3,10 @@
 #include <stdio.h>
 #include <iostream>
 #include <fstream>
+
 template <typename ... T>
 void Error(const char* format, T const& ... args) {
-	printf("[\x1b[31m-\x1b[39m] \x1b[41m");
+	printf("[\x1b[31m!\x1b[39m] \x1b[41m");
 	printf(format, args ...);
 	printf("\x1b[49m\n");
 }
@@ -15,7 +16,6 @@ void Log(const char* format, T const& ... args) {
 	printf(format, args ...);
 	printf("\n");
 }
-
 
 namespace utils {
 	std::wstring GetFullTempPath();

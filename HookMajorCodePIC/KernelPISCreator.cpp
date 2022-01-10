@@ -17,7 +17,8 @@ typedef NTSTATUS(__stdcall* pRtlCopyMemory)(_In_  PVOID Destination, _In_  const
 typedef PEPROCESS(__stdcall* pIoGetCurrentProcess)();
 typedef HANDLE(__stdcall* pPsGetProcessId)(_In_ PEPROCESS Process);
 typedef ULONG(__stdcall* pDbgPrint)(_In_ PCSTR Format, ...);
-typedef NTSTATUS(__stdcall* pObReferenceObjectByName)(__in PUNICODE_STRING ObjectName,
+typedef NTSTATUS(__stdcall* pObReferenceObjectByName)(
+	__in PUNICODE_STRING ObjectName,
 	__in ULONG Attributes,
 	__in_opt PACCESS_STATE AccessState,
 	__in_opt ACCESS_MASK DesiredAccess,
@@ -28,71 +29,15 @@ typedef NTSTATUS(__stdcall* pObReferenceObjectByName)(__in PUNICODE_STRING Objec
 typedef LONG_PTR(__stdcall* pObfDereferenceObject)(_In_  PVOID Object);
 typedef LONG_PTR(__stdcall* pRtlInitUnicodeString)(PUNICODE_STRING  DestinationString, PCWSTR SourceString);
 
-#pragma runtime_checks( "", off )
+#pragma runtime_checks("", off)
 #pragma optimize("", off)
-#pragma code_seg(".text$AAAA")
+#pragma strict_gs_check(off)
 
-BOOL
+extern "C" void
 __declspec(safebuffers)
-__declspec(noinline)
-__stdcall MyDispatchIoctlDBVM(IN PDEVICE_OBJECT DeviceObject, ULONG IoControlCode, PVOID lpInBuffer, DWORD nInBufferSize, PVOID lpOutBuffer, DWORD nOutBufferSize, PDWORD lpBytesReturned)
-{
-	UNREFERENCED_PARAMETER(DeviceObject);
-	UNREFERENCED_PARAMETER(IoControlCode);
-	UNREFERENCED_PARAMETER(lpInBuffer);
-	UNREFERENCED_PARAMETER(nInBufferSize);
-	UNREFERENCED_PARAMETER(lpOutBuffer);
-	UNREFERENCED_PARAMETER(nOutBufferSize);
-	UNREFERENCED_PARAMETER(lpBytesReturned);
+__declspec(noinline) PicStart(PVOID StartContext);
 
-	NTSTATUS ntStatus = STATUS_UNSUCCESSFUL;
-	struct input
-	{
-		UINT64 MmGetSystemRoutineAddressAddress;
-		UINT64 RtlInitUnicodeStringAddress;
-		UINT64 PEPROCESS;
-	} *inp;
-
-	struct output
-	{
-		UINT64 Address;
-	} *outp;
-
-	UNICODE_STRING temp;
-
-	inp = (input*)lpInBuffer;
-	outp = (output*)lpInBuffer;
-
-	pRtlInitUnicodeString rtlInitUnicodeString = (pRtlInitUnicodeString)inp->RtlInitUnicodeStringAddress;
-	rtlInitUnicodeString(&temp, (PCWSTR)inp->PEPROCESS);
-	pMmGetSystemRoutineAddress mmGetSystemRoutineAddress = (pMmGetSystemRoutineAddress)inp->MmGetSystemRoutineAddressAddress;
-	UINT64 funcAddr = (UINT64)mmGetSystemRoutineAddress(&temp);
-
-	WCHAR DbgPrintName[] = { 'D', 'b', 'g', 'P', 'r', 'i', 'n', 't', '\0' };
-	WCHAR erroString[] = { 'f', 'u', 'n', 'c', 'A', 'd', 'd', 'r', '=', '=', 'N', 'U', 'L', 'L', 0 };
-	WCHAR greetingString[] = { 'H', 'e', 'l', 'l', 'o', 'r', ' ', 'F', 'r', 'o', 'm', ' ', 'M', 'y', 'D', 'i', 's', 'p', 'a', 't', 'c', 'h', 'I', 'o', 'c', 't', 'l', 'D', 'B', 'V', 'M', 0 };
-	UNICODE_STRING dbgPrint = RTL_CONSTANT_STRING(DbgPrintName);
-	UNICODE_STRING erro = RTL_CONSTANT_STRING(erroString);
-	UNICODE_STRING greeting = RTL_CONSTANT_STRING(greetingString);
-
-	pDbgPrint myDbgPrint = (pDbgPrint)mmGetSystemRoutineAddress(&dbgPrint);
-
-	if (funcAddr != NULL)
-	{
-		outp->Address = funcAddr;
-		ntStatus = STATUS_SUCCESS;
-	}
-	else
-	{
-		myDbgPrint("%ls", erro);
-		ntStatus = STATUS_UNSUCCESSFUL;
-	}
-
-
-	myDbgPrint("%ls", greeting);
-	
-	return TRUE;
-}
+#pragma alloc_text(".PIS", "PicStart")
 
 void
 __declspec(safebuffers)
@@ -101,16 +46,16 @@ __stdcall PicStart(PVOID StartContext)
 {
 	// __debugbreak(); // INT 3 for debugging
 
-	if (nullptr == StartContext)
+	if (NULL == StartContext)
 		return;
 
 	KernelPisParameters* pisParameters = (KernelPisParameters*)StartContext;
 
 	// Get MmGetSystemRoutineAddress
 	pMmGetSystemRoutineAddress mmGetSystemRoutineAddress = (pMmGetSystemRoutineAddress)pisParameters->MmGetSystemRoutineAddress;
-	if (nullptr == mmGetSystemRoutineAddress)
+	if (NULL == mmGetSystemRoutineAddress)
 		return;
-
+	
 	// Function names		
 	WCHAR ioGetCurrentProcessName[] = { 'P','s','G','e','t','C','u','r','r','e','n','t','P','r','o','c','e','s','s','\0' };
 	WCHAR psGetProcessIdName[] = { 'P','s','G','e','t','P','r','o','c','e','s','s','I','d','\0' };
@@ -134,12 +79,12 @@ __stdcall PicStart(PVOID StartContext)
 	myDbgPrint("%ls", greeting);
 
 	// Check addresses validity
-	if (nullptr == ioGetCurrentProcess || nullptr == psGetProcessId || nullptr == rtlCopyMemory)
+	if (NULL == ioGetCurrentProcess || NULL == psGetProcessId || NULL == rtlCopyMemory)
 		return;
 
 	// Get current process object	
 	PEPROCESS process = ioGetCurrentProcess();
-	if (nullptr == process)
+	if (NULL == process)
 		return;
 
 	// Convert to ULONG and copy to returned data address
@@ -175,7 +120,7 @@ __stdcall PicStart(PVOID StartContext)
 
 	auto status = obReferenceObjectByName(&driverObjectName,
 		OBJ_CASE_INSENSITIVE,
-		nullptr,
+		NULL,
 		0,
 		*ioDriverObjectType,
 		KernelMode,
@@ -191,7 +136,7 @@ __stdcall PicStart(PVOID StartContext)
 		auto  MjFunc = (PVOID*)&DriverObject->MajorFunction[i];
 		myDbgPrint("Major Function Number : %d, %p", i, MjFunc);
 		if (i == IRP_MJ_DEVICE_CONTROL) {
-			InterlockedExchangePointer(MjFunc, MyDispatchIoctlDBVM);
+		//	InterlockedExchangePointer(MjFunc, MyDispatchIoctlDBVM);
 		}
 	}
 	
@@ -213,7 +158,7 @@ DriverEntry(PDRIVER_OBJECT Driverobject, PUNICODE_STRING)
 	USHORT returnedDataMaxSize = sizeof(ULONG);
 
 	ULONG* returnedDataAddress = (ULONG*)::ExAllocatePoolWithTag(NonPagedPool, returnedDataMaxSize, DRIVER_TAG);
-	if (nullptr == returnedDataAddress) {
+	if (NULL == returnedDataAddress) {
 		KdPrint((DRIVER_PREFIX "[-] Error allocating returned data space\n"));
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
@@ -229,9 +174,9 @@ DriverEntry(PDRIVER_OBJECT Driverobject, PUNICODE_STRING)
 	auto status = ::PsCreateSystemThread(
 		&threadHandle,
 		THREAD_ALL_ACCESS,
-		nullptr,
-		nullptr,
-		nullptr,
+		NULL,
+		NULL,
+		NULL,
 		PicStart,
 		&pisParameters);
 	if (!NT_SUCCESS(status))
@@ -241,10 +186,10 @@ DriverEntry(PDRIVER_OBJECT Driverobject, PUNICODE_STRING)
 	status = ::ObReferenceObjectByHandle(
 		threadHandle,
 		THREAD_ALL_ACCESS,
-		nullptr,
+		NULL,
 		KernelMode,
 		&threadObject,
-		nullptr);
+		NULL);
 	if (!NT_SUCCESS(status))
 		return status;
 
@@ -253,7 +198,7 @@ DriverEntry(PDRIVER_OBJECT Driverobject, PUNICODE_STRING)
 		Executive,
 		KernelMode,
 		FALSE,
-		nullptr);
+		NULL);
 	if (!NT_SUCCESS(status))
 		return status;
 

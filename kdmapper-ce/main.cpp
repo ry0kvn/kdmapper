@@ -43,7 +43,7 @@ int wmain(const int argc, wchar_t** argv) {
 
 	do {
 
-		// kernelmoduleunloaderにシェルコードをインジェクトし，dbk64.sysのデバイスハンドルを取得
+		// kernelmoduleunloader.exe プロセスにシェルコードをインジェクトし，dbk64.sysのデバイスハンドルを取得
 		Log("Injecting shellcode into KernelModuleUnloader.exe process to get device handle of Dbk64.sys...");
 		HANDLE dbk64_device_handle = kdmapper_ce::GetDbk64DeviceHandle();
 		if (dbk64_device_handle == INVALID_HANDLE_VALUE) {
@@ -63,7 +63,7 @@ int wmain(const int argc, wchar_t** argv) {
 		Log("Ready, load the input driver...");
 		NTSTATUS exitCode = 0;
 		if (!kdmapper_ce::MapDriver(dbk64_device_handle, hDriver, &exitCode)) {
-			Error("Failed to map %s", DriverName);
+			Error("Failed to map %ls", DriverName);
 			break;
 		}
 

@@ -7,6 +7,19 @@
 #define TO_LOWERCASE(out, c1) (out = (c1 <= 'Z' && c1 >= 'A') ? c1 = (c1 - 'A') + 'a': c1)
 #endif
 
+extern "C"
+inline LPVOID get_module_by_name(
+    WCHAR * module_name
+);
+
+extern "C"
+inline LPVOID get_func_by_name(
+    LPVOID module,
+    char* func_name
+);
+
+#pragma alloc_text(".PIS", "get_func_by_name")
+#pragma alloc_text(".PIS", "get_module_by_name")
 
 typedef struct _UNICODE_STRING
 {
@@ -64,7 +77,7 @@ typedef struct _PEB
 } PEB, * PPEB;
 
 #endif //__NTDLL_H__
-
+extern "C"
 inline LPVOID get_module_by_name(WCHAR* module_name)
 {
     PPEB peb = NULL;
@@ -100,6 +113,7 @@ inline LPVOID get_module_by_name(WCHAR* module_name)
     return NULL;
 }
 
+extern "C"
 inline LPVOID get_func_by_name(LPVOID module, char* func_name)
 {
     IMAGE_DOS_HEADER* idh = (IMAGE_DOS_HEADER*)module;

@@ -277,9 +277,11 @@ BOOL kdmapper_ce::MapDriver(HANDLE dbk64_device_handle, HANDLE hDriver, NTSTATUS
     }
     
     if (ntHeaders->OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR64_MAGIC) {
-        Error("[-] Image is not 64 bit");
+        Error("Image is not 64 bit");
         break;
     }
+
+    Log("Validity of the inputted driver: Valid");
 
     uint32_t ImageSize = ntHeaders->OptionalHeader.SizeOfImage;
 
@@ -290,7 +292,7 @@ BOOL kdmapper_ce::MapDriver(HANDLE dbk64_device_handle, HANDLE hDriver, NTSTATUS
     }
 
     Log("Kernel memory has been allocatted at 0x%p", KernelBuf);
-
+    
     // 上で確保したバッファのMDL を作成し，ユーザー空間からアクセス可能にする
 
     VOID* SharedBuf = NULL;
@@ -659,7 +661,7 @@ bool kdmapper_ce::ResolveImports(HANDLE hDevice, portable_executable::vec_import
             uint64_t function_address = (uint64_t)GetSystemProcAddress(hDevice, function_name.c_str());
 
             //uint64_t function_address = MmGetSystemRoutineAddress(hDevice, current_function_data.name);
-            Log("ResolveImports: import %s (0x%p)", current_function_data.name, function_address);
+            Log("ResolveImports: import %ls (0x%p)", function_name.c_str(), function_address);
 //            if (!function_address) {
 //                //Lets try with ntoskrnl
 //                if (Module != ntoskrnlAddr) {
