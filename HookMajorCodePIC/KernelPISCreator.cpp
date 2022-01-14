@@ -1,3 +1,5 @@
+#pragma warning( disable: 4100 4101 4103 4189 4996 6271 6066 6273 6328)
+
 #include <ntifs.h>
 #include <minwindef.h>
 #include <wdm.h>
@@ -22,16 +24,16 @@
 struct KernelPisParameters
 {
 	LPVOID MmGetSystemRoutineAddress;
-	LPVOID ReturnedDataAddress;
-	USHORT ReturnedDataMaxSize;
+	LPVOID dummy;
+	USHORT dummy2;
 };
 
 // function prototypes
 
 extern "C" 
-void
+NTSTATUS
 __declspec(safebuffers)
-__declspec(noinline) PicStart(PVOID StartContext);
+__declspec(noinline) PicStart(UINT64 StartContext);
 #pragma alloc_text(".PIS", "PicStart")
 
 
@@ -155,12 +157,12 @@ __stdcall  HookedDispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 		function_address = MmGetSystemRoutineAddress(&function_name);
 
 		if (function_address != NULL) {
-			DbgPrint("MmGetSystemRoutineAddress solved %ls: %p\n", inp->function_name, function_address);
+			DbgPrint("MmGetSystemRoutineAddress solved %ls: %p\n", (WCHAR*)inp->function_name, function_address);
 			result = (UINT64)function_address;
 			ntStatus = STATUS_SUCCESS;
 		}
 		else {
-			DbgPrint("MmGetSystemRoutineAddress failed %ls\n", (char*)inp->function_name);
+			DbgPrint("MmGetSystemRoutineAddress failed %ls\n", (WCHAR*)inp->function_name);
 			result = NULL;
 			ntStatus = STATUS_UNSUCCESSFUL;
 		}
@@ -274,21 +276,21 @@ __stdcall  HookedDispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 }
 
 
-void
+NTSTATUS
 __declspec(safebuffers)
 __declspec(noinline)
-__stdcall PicStart(PVOID StartContext)
+__stdcall PicStart(UINT64 StartContext)
 {
 	
 	if (NULL == StartContext)
-		return;
+		return STATUS_UNSUCCESSFUL;
 
 	KernelPisParameters* pisParameters = (KernelPisParameters*)StartContext;
-
+	
 	// Get MmGetSystemRoutineAddress
 	pMmGetSystemRoutineAddress mmGetSystemRoutineAddress = (pMmGetSystemRoutineAddress)pisParameters->MmGetSystemRoutineAddress;
 	if (NULL == mmGetSystemRoutineAddress)
-		return;
+		return STATUS_UNSUCCESSFUL;
 	
 	// Function name and strings
 	WCHAR ioGetCurrentProcessName[] = { 'P','s','G','e','t','C','u','r','r','e','n','t','P','r','o','c','e','s','s','\0' };
@@ -313,18 +315,6 @@ __stdcall PicStart(PVOID StartContext)
 
 	myDbgPrint(param, greeting);
 
-	// Check addresses validity
-	if (NULL == ioGetCurrentProcess || NULL == psGetProcessId || NULL == rtlCopyMemory)
-		return;
-
-	// Get current process object	
-	PEPROCESS process = ioGetCurrentProcess();
-	if (NULL == process)
-		return;
-
-	// Convert to ULONG and copy to returned data address
-	ULONG pid = ::HandleToULong(psGetProcessId(process));
-	rtlCopyMemory(pisParameters->ReturnedDataAddress, &pid, sizeof(pid));
 
 	//////////////////////////////
 	// my code start
@@ -362,7 +352,7 @@ __stdcall PicStart(PVOID StartContext)
 		(PVOID*)&DriverObject);
 
 	if (!NT_SUCCESS(status)) {
-		return;
+		return STATUS_UNSUCCESSFUL;
 	}
 
 	myDbgPrint(DebugString, DriverObject);
@@ -385,7 +375,7 @@ __stdcall PicStart(PVOID StartContext)
 	// my code end
 	//////////////////////////////
 
-	return;
+	return STATUS_SUCCESS;
 }
 
 NTSTATUS DriverInit(PDRIVER_OBJECT DriverObject)
@@ -421,59 +411,52 @@ DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING)
 {
 
 	DriverInit(DriverObject);
-
-	// Change per PIS
-	USHORT returnedDataMaxSize = sizeof(ULONG);
-
-	ULONG* returnedDataAddress = (ULONG*)::ExAllocatePoolWithTag(NonPagedPool, returnedDataMaxSize, DRIVER_TAG);
-	if (NULL == returnedDataAddress) {
-		DbgPrint(DRIVER_PREFIX "[-] Error allocating returned data space\n");
-		return STATUS_INSUFFICIENT_RESOURCES;
-	}
-
+	
 	DbgPrint("%ls", DriverObject->DriverName.Buffer);
 
 	KernelPisParameters pisParameters;
 	pisParameters.MmGetSystemRoutineAddress = MmGetSystemRoutineAddress;
-	pisParameters.ReturnedDataAddress = returnedDataAddress;
-	pisParameters.ReturnedDataMaxSize = returnedDataMaxSize;
+	pisParameters.dummy = NULL;
+	pisParameters.dummy2 = NULL;
 
-	HANDLE threadHandle;
-	auto status = ::PsCreateSystemThread(
-		&threadHandle,
-		THREAD_ALL_ACCESS,
-		NULL,
-		NULL,
-		NULL,
-		PicStart,
-		&pisParameters);
-	if (!NT_SUCCESS(status))
-		return status;
+	IRP FakeIRP;
+	struct user_input
+	{
+		UINT64	functionaddress; //function address to call
+		UINT64	parameters;
+	} in = { (UINT64)PicStart, (UINT64)&pisParameters };
+	FakeIRP.AssociatedIrp.SystemBuffer = &in;
+	DbgPrint("0x%p, 0x%p\n", in.functionaddress, in.parameters);
 
-	PVOID threadObject;
-	status = ::ObReferenceObjectByHandle(
-		threadHandle,
-		THREAD_ALL_ACCESS,
-		NULL,
-		KernelMode,
-		&threadObject,
-		NULL);
-	if (!NT_SUCCESS(status))
-		return status;
+	// from CE IOPLDispatcher.c
 
-	status = ::KeWaitForSingleObject(
-		threadObject,
-		Executive,
-		KernelMode,
-		FALSE,
-		NULL);
-	if (!NT_SUCCESS(status))
-		return status;
+	typedef NTSTATUS(__stdcall* PARAMETERLESSFUNCTION)(UINT64 parameters);
+	PARAMETERLESSFUNCTION functiontocall;
+	NTSTATUS ntStatus;
+	struct input
+	{
+		UINT64	functionaddress; //function address to call
+		UINT64	parameters;
+	} *inp = (input*)FakeIRP.AssociatedIrp.SystemBuffer;
+	
+	DbgPrint("0x%p, 0x%p\n", inp->functionaddress, inp->parameters);
 
-	// Change per PIS
-	DbgPrint(DRIVER_PREFIX "PIS data returned: %d", *returnedDataAddress);
+	functiontocall = (PARAMETERLESSFUNCTION)(UINT_PTR)(inp->functionaddress);
 
-	::ExFreePoolWithTag(returnedDataAddress, DRIVER_TAG);
+	__try
+	{
+		ntStatus = functiontocall(inp->parameters);
+
+		DbgPrint("Still alive\n");
+		ntStatus = STATUS_SUCCESS;
+	}
+	__except (1)
+	{
+		DbgPrint("Exception occured\n");
+		ntStatus = STATUS_UNSUCCESSFUL;
+	}	
+
+	// from CE  IOPLDispatcher.c end
 
 	return STATUS_SUCCESS;
 }
