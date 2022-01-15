@@ -7,6 +7,6 @@
 #include "ce_driver.hpp"
 
 namespace service {
-	bool RegisterAndStart(const std::wstring& driver_path);
+	bool RegisterAndStart(const std::wstring& driver_path, const std::wstring& driver_name);
 	bool StopAndRemove(const std::wstring& driver_name);
 }

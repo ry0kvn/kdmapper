@@ -261,13 +261,13 @@ BOOL kdmapper_ce::MapDriver(HANDLE dbk64_device_handle, HANDLE hDriver, NTSTATUS
 
         // DeviceIoControlTest
 #ifdef _DEBUG
-        if (!Dbk64DeviceIoControlTest(dbk64_device_handle)) {
-            Error("DeviceIoControlTest failed");
-            return FALSE;
-        }
+        //if (!Dbk64DeviceIoControlTest(dbk64_device_handle)) {
+        //    Error("DeviceIoControlTest failed");
+        //    return FALSE;
+        //}
 #endif // _DEBUG
 
-        // .sys ファイルをパース
+      // .sys ファイルをパース
 
     const PIMAGE_NT_HEADERS64 ntHeaders = portable_executable::GetNtHeaders(hDriver);
     
@@ -340,16 +340,18 @@ BOOL kdmapper_ce::MapDriver(HANDLE dbk64_device_handle, HANDLE hDriver, NTSTATUS
         break;
     }
 
+    Log("Successfully removed shared memory from user space...");
+
     // Call driver entry point
 
     const uint64_t address_of_entry_point = (uint64_t)KernelBuf + ntHeaders->OptionalHeader.AddressOfEntryPoint;
 
-    Log("Calling DriverEntry 0x%p", address_of_entry_point);
-    if (!kdmapper_ce::CallDriverEntry(dbk64_device_handle, address_of_entry_point)) {
-        Error("Failed to call driver entry");
+    Log("Calling DriverEntry 0x%p", address_of_entry_point);       
+    if (!kdmapper_ce::CreateDriverObject(dbk64_device_handle, address_of_entry_point, L"\\Driver\\TDLD")) {
+        Error("CreateDriverObject failed");
         break;
     }
-        
+
     status = TRUE;
 
     } while (FALSE);
@@ -357,16 +359,23 @@ BOOL kdmapper_ce::MapDriver(HANDLE dbk64_device_handle, HANDLE hDriver, NTSTATUS
     return status;
 }
 
-bool kdmapper_ce::CallDriverEntry(HANDLE hDevice, UINT64 EntryPoint) {
 
-    auto ioCtlCode = IOCTL_CE_EXECUTE_CODE;
+bool kdmapper_ce::CreateDriverObject(HANDLE hDevice, UINT64 EntryPoint, PCWSTR driverName) {
+
+    auto ioCtlCode = IOCTL_CREATE_DRIVER;
     DWORD returned;
+    UINT64 pMmGetSystemRoutineAddress = (UINT64)GetSystemProcAddress(hDevice, L"MmGetSystemRoutineAddress");
 
     struct input
     {
-        UINT64	functionaddress;
-        UINT64	parameters;
-    }inp = { EntryPoint, NULL };
+        UINT64 MmGetSystemRoutineAddress;
+        UINT64 DriverInitialize;
+        UINT64 driverName;
+    } inp = { 
+        pMmGetSystemRoutineAddress,
+        EntryPoint, 
+        (UINT64)driverName 
+    };
 
     if (DeviceIoControl(hDevice, ioCtlCode, &inp, sizeof input, nullptr, 0, &returned, nullptr))
         return TRUE;
@@ -377,14 +386,16 @@ bool kdmapper_ce::CallDriverEntry(HANDLE hDevice, UINT64 EntryPoint) {
 
 UINT64 kdmapper_ce::AllocateNonPagedMem(HANDLE hDevice,  SIZE_T Size) {
 
-    auto ioCtlCode = IOCTL_CE_ALLOCATEMEM_NONPAGED;
+    auto ioCtlCode = IOCTL_ALLOCATEMEM_NONPAGED;
     DWORD bytesReturned = 0;
     BOOL bRc = FALSE;
+    UINT64 pMmGetSystemRoutineAddress = (UINT64)GetSystemProcAddress(hDevice, L"MmGetSystemRoutineAddress");
 
     struct input
     {
-        UINT64 Size;
-    } inp = { Size };
+        UINT64 MmGetSystemRoutineAddress;
+        SIZE_T Size;
+    } inp = { pMmGetSystemRoutineAddress, Size };
 
     bRc = DeviceIoControl(hDevice,
         (DWORD)ioCtlCode,
@@ -396,23 +407,21 @@ UINT64 kdmapper_ce::AllocateNonPagedMem(HANDLE hDevice,  SIZE_T Size) {
         NULL
     );
 
-    return inp.Size;
+    return inp.MmGetSystemRoutineAddress;
 }
 
 BOOL kdmapper_ce::CreateSharedMemory(HANDLE hDevice, UINT64 kernelBuf, UINT64* sharedBuf, UINT64* Mdl, SIZE_T bufSize) {
 
-    auto ioCtlCode = IOCTL_CE_MAP_MEMORY;
+    auto ioCtlCode = IOCTL_MAP_MEMORY;
     DWORD bytesReturned = 0;
     BOOL bRc = FALSE;
 
     struct input
     {
-        UINT64 FromPID;
-        UINT64 ToPID;
+        UINT64 TargetPID;
         UINT64 address;
         DWORD size;
     } inp = { 
-        GetCurrentProcessId(),
         GetCurrentProcessId(),
         kernelBuf,
         bufSize
@@ -420,7 +429,7 @@ BOOL kdmapper_ce::CreateSharedMemory(HANDLE hDevice, UINT64 kernelBuf, UINT64* s
 
     struct output
     {
-        UINT64 FromMDL;
+        UINT64 MDL;
         UINT64 Address;
     } outp = { 0 };
 
@@ -435,27 +444,27 @@ BOOL kdmapper_ce::CreateSharedMemory(HANDLE hDevice, UINT64 kernelBuf, UINT64* s
     );
 
     *sharedBuf = outp.Address;
-    *Mdl = outp.FromMDL;
+    *Mdl = outp.MDL;
 
     return bRc;
 }
 
 BOOL kdmapper_ce::UnMapSharedMemory(HANDLE hDevice, UINT64 sharedMemAddress, UINT64 Mdl){
 
-    auto ioCtlCode = IOCTL_CE_UNMAP_MEMORY;
+    auto ioCtlCode = IOCTL_UNMAP_MEMORY;
     DWORD bytesReturned = 0;
     BOOL bRc = FALSE;
 
-    struct output
+    struct input
     {
-        UINT64 FromMDL;
+        UINT64 MDL;
         UINT64 Address;
-    } outp = {Mdl, sharedMemAddress };
+    } inp = {Mdl, sharedMemAddress };
     
     bRc = DeviceIoControl(hDevice,
         (DWORD)ioCtlCode,
-        &outp,
-        sizeof(output),
+        &inp,
+        sizeof(input),
         NULL,
         0,
         &bytesReturned,
@@ -467,7 +476,7 @@ BOOL kdmapper_ce::UnMapSharedMemory(HANDLE hDevice, UINT64 sharedMemAddress, UIN
 
 BOOL kdmapper_ce::ExecuteKernelModeShellCode(HANDLE hDevice, UINT64 shellcodeAddress, UINT64 shellcodeParam) {
 
-    auto ioCtlCode = IOCTL_CE_EXECUTE_CODE;
+    auto ioCtlCode = IOCTL_EXECUTE_CODE;
     DWORD bytesReturned = 0;
     BOOL bRc = FALSE;
 
@@ -496,8 +505,10 @@ BOOL kdmapper_ce::ExecuteKernelModeShellCode(HANDLE hDevice, UINT64 shellcodeAdd
 
 
 BOOL kdmapper_ce::Dbk64DeviceIoControlTest(HANDLE hDevice) {
-    
-    auto ioCtlCode = IOCTL_CE_TEST;
+#define IOCTL_UNKNOWN_BASE					FILE_DEVICE_UNKNOWN
+#define IOCTL_TEST		CTL_CODE(IOCTL_UNKNOWN_BASE, 0x0807, METHOD_BUFFERED, FILE_WRITE_ACCESS)
+
+    auto ioCtlCode = IOCTL_TEST;
     DWORD bytesReturned = 0;
     BOOL bRc = FALSE;
 
@@ -514,15 +525,15 @@ BOOL kdmapper_ce::Dbk64DeviceIoControlTest(HANDLE hDevice) {
     return bRc;
 }
 
-PVOID kdmapper_ce::GetSystemProcAddress(HANDLE hDevice, PCWSTR routineName) {
-    auto ioCtlCode = IOCTL_CE_GETPROCADDRESS;
+PVOID kdmapper_ce::GetSystemProcAddressAddress(HANDLE hDevice) {
+    auto ioCtlCode = IOCTL_GETPROCADDRESS_ADDRESS;
     DWORD bytesReturned = 0;
     BOOL bRc = FALSE;
-    
+
     struct input
     {
-        UINT64 s;
-    } inp = { (UINT64)routineName };
+        UINT64 MmGetSystemRoutineAddress;
+    } inp = { NULL };
 
     bRc = DeviceIoControl(hDevice,
         (DWORD)ioCtlCode,
@@ -534,7 +545,32 @@ PVOID kdmapper_ce::GetSystemProcAddress(HANDLE hDevice, PCWSTR routineName) {
         NULL
     );
 
-    return (PVOID)inp.s;
+    return (PVOID)inp.MmGetSystemRoutineAddress;
+}
+
+PVOID kdmapper_ce::GetSystemProcAddress(HANDLE hDevice, PCWSTR functionName) {
+    auto ioCtlCode = IOCTL_GETPROCADDRESS;
+    DWORD bytesReturned = 0;
+    BOOL bRc = FALSE;
+    UINT64 pMmGetSystemRoutineAddress = (UINT64)GetSystemProcAddressAddress(hDevice);
+
+    struct input
+    {
+        UINT64 MmGetSystemRoutineAddress;
+        UINT64 functionName;
+    } inp = { pMmGetSystemRoutineAddress, (UINT64)functionName };
+
+    bRc = DeviceIoControl(hDevice,
+        (DWORD)ioCtlCode,
+        &inp,
+        sizeof(input),
+        &inp,
+        sizeof(inp),
+        &bytesReturned,
+        NULL
+    );
+
+    return (PVOID)inp.MmGetSystemRoutineAddress;
 }
 
 BOOL kdmapper_ce::PatchMajorFunction(HANDLE dbk64_device_handle)
@@ -557,7 +593,7 @@ BOOL kdmapper_ce::PatchMajorFunction(HANDLE dbk64_device_handle)
 
         // IRP_MJ_DEVICE_CONTROL の Hook
 
-        // IOCTL_CE_ALLOCATEMEM_NONPAGEDで非ページプールにメモリを確保
+        // IOCTL_ALLOCATEMEM_NONPAGEDで非ページプールにメモリを確保
 
         UINT64 kernelShellcodeBuf = AllocateNonPagedMem(dbk64_device_handle, shellcodeSize);
         if (kernelShellcodeBuf == NULL) {

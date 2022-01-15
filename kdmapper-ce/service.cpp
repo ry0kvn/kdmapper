@@ -1,10 +1,12 @@
 #include "service.hpp"
 
-bool service::RegisterAndStart(const std::wstring& driver_path) {
+bool service::RegisterAndStart(const std::wstring& driver_path, const std::wstring& driver_name) {
 	const static DWORD ServiceTypeKernel = 1;
 	//const std::wstring driver_name = L"mydbk64";
 	//const std::wstring servicesPath = L"SYSTEM\\CurrentControlSet\\Services\\" + driver_name;
-	const std::wstring servicesPath = L"SYSTEM\\ControlSet001\\Services\\" +ce_driver::GetDriverNameW();
+	//const std::wstring servicesPath = L"SYSTEM\\ControlSet001\\Services\\" +ce_driver::GetDriverNameW();
+	const std::wstring servicesPath = L"SYSTEM\\ControlSet001\\Services\\" + driver_name;
+
 	const std::wstring nPath = L"\\??\\" + driver_path;
 
 	HKEY dservice;
@@ -90,7 +92,7 @@ bool service::RegisterAndStart(const std::wstring& driver_path) {
 		Log("Fatal error: failed to acquire SE_LOAD_DRIVER_PRIVILEGE. Make sure you are running as administrator.");
 		return false;
 	}
-	std::wstring ServiceName = ce_driver::GetDriverNameW();
+	std::wstring ServiceName = driver_name;
 
 	// TODO: fix
 	typedef NTSTATUS(*myNtLoadDriver)(_In_ PUNICODE_STRING DriverServiceName);
@@ -98,7 +100,7 @@ bool service::RegisterAndStart(const std::wstring& driver_path) {
 
 	typedef VOID(*myRtlInitUnicodeString)(PUNICODE_STRING DestinationString, PCWSTR SourceString);
 	auto RtlInitUnicodeString = (myRtlInitUnicodeString)GetProcAddress(ntdll, "RtlInitUnicodeString");
-	std::wstring wdriver_reg_path = L"\\Registry\\Machine\\System\\ControlSet001\\Services\\" + ce_driver::GetDriverNameW();
+	std::wstring wdriver_reg_path = L"\\Registry\\Machine\\System\\ControlSet001\\Services\\" + driver_name;
 	UNICODE_STRING serviceStr;
 	RtlInitUnicodeString(&serviceStr, wdriver_reg_path.c_str());
 
@@ -121,7 +123,7 @@ bool service::StopAndRemove(const std::wstring& driver_name) {
 	HMODULE ntdll = GetModuleHandleA("ntdll.dll");
 	if (ntdll == NULL)
 		return false;
-	std::wstring wdriver_reg_path = L"\\Registry\\Machine\\System\\ControlSet001\\Services\\" + ce_driver::GetDriverNameW();
+	std::wstring wdriver_reg_path = L"\\Registry\\Machine\\System\\ControlSet001\\Services\\" + driver_name;
 	UNICODE_STRING serviceStr;
 
 	typedef VOID(NTAPI* my_RtlInitUnicodeString) (
@@ -134,7 +136,7 @@ bool service::StopAndRemove(const std::wstring& driver_name) {
 	RtlInitUnicodeString(&serviceStr, wdriver_reg_path.c_str());
 
 	HKEY driver_service;
-	std::wstring servicesPath = L"SYSTEM\\ControlSet001\\Services\\" + ce_driver::GetDriverNameW();
+	std::wstring servicesPath = L"SYSTEM\\ControlSet001\\Services\\" + driver_name;
 	LSTATUS status = RegOpenKeyW(HKEY_LOCAL_MACHINE, servicesPath.c_str(), &driver_service);
 	if (status != ERROR_SUCCESS) {
 		if (status == ERROR_FILE_NOT_FOUND) {

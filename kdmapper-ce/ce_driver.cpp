@@ -71,7 +71,7 @@ BOOL ce_driver::Load() {
 #endif //  _DEBUG
 
 
-	if (!service::RegisterAndStart(driver_path)) {
+	if (!service::RegisterAndStart(driver_path, ce_driver::GetDriverNameW())) {
 		Log("Failed to register and start service for the vulnerable driver");
 		_wremove(driver_path.c_str());
 		return result;

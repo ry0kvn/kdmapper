@@ -10,12 +10,14 @@ int wmain(const int argc, wchar_t** argv) {
 #endif
 
 	wchar_t DriverFullPath[MAX_PATH] = { 0 };
-	const wchar_t* DriverName = argv[1];
+	wchar_t LoaderDriverFullPath[MAX_PATH] = { 0 };
+	const wchar_t* LoaderDriverName = argv[1];
+	const wchar_t* DriverName = argv[2];
 	HANDLE hDriver = NULL;
 
 	// コマンドライン引数に与えられたファイルをメモリにロード
 
-	if (argc < 2) {
+	if (argc < 3) {
 		Error("Usage: kdmapper-ce.exe <driver_path>");
 		return -1;
 	}
@@ -34,35 +36,41 @@ int wmain(const int argc, wchar_t** argv) {
 		return -1;
 	}
 
-	// dbk64.sysファイルをディスクにドロップしサービスを作成，開始
-	// TODO: おそらく削除処理に漏れがある
-	if (!ce_driver::Load()) {
-		Error("ce_driver::Load() failed");
+
+	if (!_wfullpath(LoaderDriverFullPath, LoaderDriverName, MAX_PATH)) {
+		Error("_wfullpath failed");
+		return -1;
+	}
+
+	std::wstring laoder_driver_path = LoaderDriverFullPath;
+	if (laoder_driver_path.empty()) {
+		Log("Can't find TEMP folder");
+		return -1;
+	}
+	std::wstring loader_driver_name = LoaderDriverName;
+	if (!service::RegisterAndStart(laoder_driver_path, loader_driver_name.substr(0, loader_driver_name.find('.')))) {
+		Error("RegisterAndStart failed");
 		return -1;
 	}
 
 	do {
 
-		// kernelmoduleunloader.exe プロセスにシェルコードをインジェクトし，dbk64.sysのデバイスハンドルを取得
-		Log("Injecting shellcode into KernelModuleUnloader.exe process to get device handle of Dbk64.sys...");
-		HANDLE dbk64_device_handle = kdmapper_ce::GetDbk64DeviceHandle();
-		if (dbk64_device_handle == INVALID_HANDLE_VALUE) {
-			Error("kdmapper_ce::GetDbk64DeviceHandle failed");
-			break;
-		}
+		// Open the device
+#define RL_DEVICE_NAME L"\\Device\\KernelPISCreator"
+#define RL_SYM_NAME L"\\??\\KernelPISCreator"
+#define RL_USER_SYM_NAME L"\\\\.\\KernelPISCreator"
 
-		// Dbk64.sysのIRP_MJ_DEVICE_CONTROLにパッチを当て，
-		// ドライバをロードする代替コードでフックする
-		//Log("Patching IRP_MJ_DEVICE_CONTROL in Dbk64.sys driver to hook IRP...");
-		//if (!kdmapper_ce::PatchMajorFunction(dbk64_device_handle)) {
-		//	Error("kdmapper_ce::PatchMajorFunction failed");
-		//	break;
-		//}
+		HANDLE device_handle = CreateFile(RL_USER_SYM_NAME,
+			GENERIC_READ | GENERIC_WRITE,
+			FILE_SHARE_READ | FILE_SHARE_WRITE,
+			nullptr,
+			OPEN_EXISTING,
+			0,
+			nullptr);
 
-		// TODO: 入力されたドライバのロード
-		Log("Ready, load the input driver...");
+
 		NTSTATUS exitCode = 0;
-		if (!kdmapper_ce::MapDriver(dbk64_device_handle, hDriver, &exitCode)) {
+		if (!kdmapper_ce::MapDriver(device_handle, hDriver, &exitCode)) {
 			Error("Failed to map %ls", DriverName);
 			break;
 		}
@@ -75,9 +83,9 @@ int wmain(const int argc, wchar_t** argv) {
 
 
 	// サービスの停止，削除
-	if (!service::StopAndRemove(ce_driver::GetDriverNameW())) {
+	if (!service::StopAndRemove(loader_driver_name.substr(0, loader_driver_name.find('.')))) {
 		Error("Failed to stop and remove service for the vulnerable driver");
-		_wremove(ce_driver::GetDriverPath().c_str());
+		_wremove(LoaderDriverName);
 		return -1;
 	}
 

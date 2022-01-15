@@ -3,20 +3,20 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <DebuggerFlavor>WindowsRemoteDebugger</DebuggerFlavor>
     <RemoteDebuggerCommand>C:\remotetmp\kdmapper-ce.exe</RemoteDebuggerCommand>
-    <RemoteDebuggerCommandArguments>HelloWorld.sys</RemoteDebuggerCommandArguments>
+    <RemoteDebuggerCommandArguments>KernelPISCreator.sys dummy.sys</RemoteDebuggerCommandArguments>
     <RemoteDebuggerServerName>desktop-ud78o3i</RemoteDebuggerServerName>
     <DeploymentDirectory>C:\remotetmp</DeploymentDirectory>
-    <AdditionalFiles>$(SolutionDir)HelloWorld.sys</AdditionalFiles>
+    <AdditionalFiles>$(SolutionDir)x64\Debug\dummy.sys;  $(SolutionDir)x64\Debug\KernelPISCreator.sys</AdditionalFiles>
     <RemoteDebuggerDeployCppRuntime>true</RemoteDebuggerDeployCppRuntime>
     <RemoteDebuggerWorkingDirectory>C:\remotetmp</RemoteDebuggerWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='experiments|x64'">
     <DebuggerFlavor>WindowsRemoteDebugger</DebuggerFlavor>
     <RemoteDebuggerCommand>C:\remotetmp\kdmapper-ce.exe</RemoteDebuggerCommand>
-    <RemoteDebuggerCommandArguments>HelloWorld.sys</RemoteDebuggerCommandArguments>
+    <RemoteDebuggerCommandArguments>KernelPISCreator.sys HelloWorld.sys</RemoteDebuggerCommandArguments>
     <RemoteDebuggerServerName>desktop-ud78o3i</RemoteDebuggerServerName>
     <DeploymentDirectory>C:\remotetmp</DeploymentDirectory>
-    <AdditionalFiles>$(SolutionDir)HelloWorld.sys</AdditionalFiles>
+    <AdditionalFiles>$(SolutionDir)HelloWorld.sys $(SolutionDir)x64\ReleaseKernelPISCreator.sys</AdditionalFiles>
     <RemoteDebuggerDeployCppRuntime>true</RemoteDebuggerDeployCppRuntime>
     <RemoteDebuggerWorkingDirectory>C:\remotetmp</RemoteDebuggerWorkingDirectory>
   </PropertyGroup>
