@@ -6,7 +6,7 @@
     <RemoteDebuggerCommandArguments>KernelPISCreator.sys dummy.sys</RemoteDebuggerCommandArguments>
     <RemoteDebuggerServerName>desktop-ud78o3i</RemoteDebuggerServerName>
     <DeploymentDirectory>C:\remotetmp</DeploymentDirectory>
-    <AdditionalFiles>$(SolutionDir)x64\Debug\dummy.sys;  $(SolutionDir)x64\Debug\KernelPISCreator.sys</AdditionalFiles>
+    <AdditionalFiles>$(SolutionDir)x64\Debug\KernelPISCreator.sys; $(SolutionDir)x64\Debug\dummy.sys</AdditionalFiles>
     <RemoteDebuggerDeployCppRuntime>true</RemoteDebuggerDeployCppRuntime>
     <RemoteDebuggerWorkingDirectory>C:\remotetmp</RemoteDebuggerWorkingDirectory>
   </PropertyGroup>

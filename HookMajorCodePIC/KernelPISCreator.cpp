@@ -18,6 +18,7 @@
 #define IOCTL_CREATE_DRIVER		CTL_CODE(IOCTL_UNKNOWN_BASE, 0x0806, METHOD_BUFFERED, FILE_WRITE_ACCESS)
 #define IOCTL_UNMAP_MEMORY					CTL_CODE(IOCTL_UNKNOWN_BASE, 0x084e, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
 #define IOCTL_GETPROCADDRESS_ADDRESS		CTL_CODE(IOCTL_UNKNOWN_BASE, 0x0803, METHOD_BUFFERED, FILE_WRITE_ACCESS)
+#define IOCTL_CE_EXECUTE_CODE					CTL_CODE(IOCTL_UNKNOWN_BASE, 0x083c, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
 
 
 
@@ -64,13 +65,32 @@ typedef LONG_PTR(__stdcall* pRtlInitUnicodeString)(PUNICODE_STRING  DestinationS
 typedef PVOID(__stdcall* p_InterlockedExchangePointerString)(PVOID * Target, _In_ PVOID Value);
 typedef NTSTATUS(__stdcall* pIoCreateDriver)(_In_  PUNICODE_STRING DriverName, _In_  PDRIVER_INITIALIZE InitializationFunction);
 typedef PVOID(__stdcall* pExAllocatePool)(__drv_strictTypeMatch(__drv_typeExpr) _In_ POOL_TYPE PoolType, _In_ SIZE_T NumberOfBytes);
+typedef VOID(__stdcall* pMmUnmapLockedPages)(_In_ PVOID BaseAddress, _Inout_ PMDL MemoryDescriptorList);
+typedef VOID(__stdcall* pMmUnlockPages)(_Inout_ PMDL MemoryDescriptorList);
+typedef VOID(__stdcall* pIoFreeMdl)(PMDL Mdl);
+typedef NTSTATUS(__stdcall* pPsLookupProcessByProcessId)(_In_ HANDLE ProcessId, _Outptr_ PEPROCESS* Process);
+typedef VOID(__stdcall* pKeStackAttachProcess)(_Inout_ PRKPROCESS PROCESS, _Out_ PRKAPC_STATE ApcState);
+typedef PMDL(__stdcall* pIoAllocateMdl)(_In_opt_ __drv_aliasesMem PVOID VirtualAddress,
+	_In_ ULONG Length,
+	_In_ BOOLEAN SecondaryBuffer,
+	_In_ BOOLEAN ChargeQuota,
+	_Inout_opt_ PIRP Irp);
+typedef VOID(__stdcall* pMmProbeAndLockPages)(_Inout_ PMDL MemoryDescriptorList, _In_ KPROCESSOR_MODE AccessMode, _In_ LOCK_OPERATION Operation);
+typedef VOID(__stdcall* pKeUnstackDetachProcess)(_In_ PRKAPC_STATE ApcState);
+typedef PVOID(__stdcall* pMmMapLockedPagesSpecifyCache)(_Inout_ PMDL MemoryDescriptorList,
+	_In_ __drv_strictType(KPROCESSOR_MODE / enum _MODE, __drv_typeConst)
+	KPROCESSOR_MODE AccessMode,
+	_In_ __drv_strictTypeMatch(__drv_typeCond) MEMORY_CACHING_TYPE CacheType,
+	_In_opt_ PVOID RequestedAddress,
+	_In_     ULONG BugCheckOnFailure,
+	_In_     ULONG Priority  // MM_PAGE_PRIORITY logically OR'd with MdlMapping*
+	);
 
 NTSTATUS CreateClose(PDEVICE_OBJECT DeviceObject, PIRP Irp) {
 	UNREFERENCED_PARAMETER(DeviceObject);
 
 	Irp->IoStatus.Status = STATUS_SUCCESS;
 	Irp->IoStatus.Information = 0;
-	DbgPrint("Hello From original CreateClose!");
 	IoCompleteRequest(Irp, IO_NO_INCREMENT);
 	return STATUS_SUCCESS;
 }
@@ -182,11 +202,13 @@ __stdcall  HookedDispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 
 		break;
 	}
+
 	case IOCTL_GETPROCADDRESS:
 	{
 		//DbgPrint("Entering IOCTL_GETPROCADDRESS\n");
 
 		PVOID functionAddress;
+		UNICODE_STRING functionName;
 		UINT64 result;
 		struct input {
 			UINT64 MmGetSystemRoutineAddress;
@@ -200,12 +222,16 @@ __stdcall  HookedDispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 			return STATUS_UNSUCCESSFUL;
 
 		// Function name and strings
-		WCHAR* functionNameString = (WCHAR*)inp->functionName;
-
+		WCHAR RtlInitUnicodeStringString[] = { 'R', 't', 'l', 'I', 'n', 'i', 't', 'U', 'n', 'i', 'c', 'o', 'd', 'e', 'S', 't', 'r', 'i', 'n', 'g', 0 };
+		
 		// Create UNICODE_STRING structures
-		UNICODE_STRING functionName = RTL_CONSTANT_STRING(functionNameString);
-			
+		UNICODE_STRING rtlInitUnicodeString = RTL_CONSTANT_STRING(RtlInitUnicodeStringString);
+		
 		// Get function addresses
+		pRtlInitUnicodeString RtlInitUnicodeString = (pRtlInitUnicodeString)MmGetSystemRoutineAddress(&rtlInitUnicodeString);
+
+		RtlInitUnicodeString(&functionName, (PCWSTR)(UINT_PTR)(inp->functionName));
+
 		functionAddress = MmGetSystemRoutineAddress(&functionName);
 
 		if (functionAddress != NULL) {
@@ -219,12 +245,15 @@ __stdcall  HookedDispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 			ntStatus = STATUS_UNSUCCESSFUL;
 		}
 
+		*(PUINT64)Irp->AssociatedIrp.SystemBuffer = 0;
+		*(PUINT_PTR)Irp->AssociatedIrp.SystemBuffer = (UINT_PTR)functionAddress;
+
 		//RtlCopyMemory(Irp->AssociatedIrp.SystemBuffer, &result, 8);
-		char* d = (char*)Irp->AssociatedIrp.SystemBuffer;
+		/*char* d = (char*)Irp->AssociatedIrp.SystemBuffer;
 		const char* s = (const char*)&result;
 		size_t len = 8;
 		while (len--)
-			*d++ = *s++;
+			*d++ = *s++;*/
 
 		Irp->IoStatus.Information = sizeof UINT64;
 
@@ -233,16 +262,36 @@ __stdcall  HookedDispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 
 	case IOCTL_UNMAP_MEMORY:
 	{
+		PMDL mdl;
 		struct input
 		{
+			UINT64 MmGetSystemRoutineAddress;
 			UINT64 MDL;
 			UINT64 Address;
 		} *inp;
-
-		PMDL mdl;
-
 		inp = (input*)Irp->AssociatedIrp.SystemBuffer;
 		mdl = (PMDL)(UINT_PTR)inp->MDL;
+		
+		// Get MmGetSystemRoutineAddress
+		pMmGetSystemRoutineAddress MmGetSystemRoutineAddress = (pMmGetSystemRoutineAddress)inp->MmGetSystemRoutineAddress;
+
+		if (NULL == MmGetSystemRoutineAddress)
+			return STATUS_UNSUCCESSFUL;
+
+		// Function name and strings
+		WCHAR MmUnmapLockedPagesString[] = {'M', 'm', 'U', 'n', 'm', 'a', 'p', 'L', 'o', 'c', 'k', 'e', 'd', 'P', 'a', 'g', 'e', 's', 0};
+		WCHAR MmUnlockPagesString[] = {'M', 'm', 'U', 'n', 'l', 'o', 'c', 'k', 'P', 'a', 'g', 'e', 's', 0};
+		WCHAR IoFreeMdlString[] = {'I', 'o', 'F', 'r', 'e', 'e', 'M', 'd', 'l', 0};
+
+		// Create UNICODE_STRING structures
+		UNICODE_STRING mmUnmapLockedPagesString = RTL_CONSTANT_STRING(MmUnmapLockedPagesString);
+		UNICODE_STRING mmUnlockPagesString = RTL_CONSTANT_STRING(MmUnlockPagesString);
+		UNICODE_STRING ioFreeMdlString = RTL_CONSTANT_STRING(IoFreeMdlString);
+
+		// Get function addresses
+		pMmUnmapLockedPages MmUnmapLockedPages = (pMmUnmapLockedPages)MmGetSystemRoutineAddress(&mmUnmapLockedPagesString);
+		pMmUnlockPages MmUnlockPages = (pMmUnlockPages)MmGetSystemRoutineAddress(&mmUnlockPagesString);
+		pIoFreeMdl IoFreeMdl = (pIoFreeMdl)MmGetSystemRoutineAddress(&ioFreeMdlString);
 
 		MmUnmapLockedPages((PMDL)(UINT_PTR)inp->Address, mdl);
 		MmUnlockPages(mdl);
@@ -257,6 +306,7 @@ __stdcall  HookedDispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 	{
 		struct input
 		{
+			UINT64 MmGetSystemRoutineAddress;
 			UINT64 TargetPID;
 			UINT64 address;
 			DWORD size;
@@ -275,11 +325,45 @@ __stdcall  HookedDispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 		inp = (input*)Irp->AssociatedIrp.SystemBuffer;
 		outp = (output*)Irp->AssociatedIrp.SystemBuffer;
 
-		DbgPrint("IOCTL_CE_MAP_MEMORY\n");
-		DbgPrint("address %x size %d\n", inp->address, inp->size);
+		// Get MmGetSystemRoutineAddress
+		pMmGetSystemRoutineAddress MmGetSystemRoutineAddress = (pMmGetSystemRoutineAddress)inp->MmGetSystemRoutineAddress;
+
+		if (NULL == MmGetSystemRoutineAddress)
+			return STATUS_UNSUCCESSFUL;
+
+		// Function name and strings
+		WCHAR PsLookupProcessByProcessIdString[] = { 'P', 's', 'L', 'o', 'o', 'k', 'u', 'p', 'P', 'r', 'o', 'c', 'e', 's', 's', 'B', 'y', 'P', 'r', 'o', 'c', 'e', 's', 's', 'I', 'd', 0 };
+		WCHAR KeStackAttachProcessString[] = { 'K', 'e', 'S', 't', 'a', 'c', 'k', 'A', 't', 't', 'a', 'c', 'h', 'P', 'r', 'o', 'c', 'e', 's', 's', 0 };
+		WCHAR IoAllocateMdlString[] = { 'I', 'o', 'A', 'l', 'l', 'o', 'c', 'a', 't', 'e', 'M', 'd', 'l', 0 };
+		WCHAR MmProbeAndLockPagesString[] = { 'M', 'm', 'P', 'r', 'o', 'b', 'e', 'A', 'n', 'd', 'L', 'o', 'c', 'k', 'P', 'a', 'g', 'e', 's', 0 };
+		WCHAR KeUnstackDetachProcessString[] = { 'K', 'e', 'U', 'n', 's', 't', 'a', 'c', 'k', 'D', 'e', 't', 'a', 'c', 'h', 'P', 'r', 'o', 'c', 'e', 's', 's', 0 };
+		WCHAR ObfDereferenceObjectString[] = { 'O', 'b', 'f', 'D', 'e', 'r', 'e', 'f', 'e', 'r', 'e', 'n', 'c', 'e', 'O', 'b', 'j', 'e', 'c', 't', 0 };
+		WCHAR MmMapLockedPagesSpecifyCacheString[] = { 'M', 'm', 'M', 'a', 'p', 'L', 'o', 'c', 'k', 'e', 'd', 'P', 'a', 'g', 'e', 's', 'S', 'p', 'e', 'c', 'i', 'f', 'y', 'C', 'a', 'c', 'h', 'e', 0 };
+
+		// Create UNICODE_STRING structures
+		UNICODE_STRING psLookupProcessByProcessIdString = RTL_CONSTANT_STRING(PsLookupProcessByProcessIdString);
+		UNICODE_STRING keStackAttachProcessString = RTL_CONSTANT_STRING(KeStackAttachProcessString);
+		UNICODE_STRING ioAllocateMdlString = RTL_CONSTANT_STRING(IoAllocateMdlString);
+		UNICODE_STRING mmProbeAndLockPagesString = RTL_CONSTANT_STRING(MmProbeAndLockPagesString);
+		UNICODE_STRING keUnstackDetachProcessString = RTL_CONSTANT_STRING(KeUnstackDetachProcessString);
+		UNICODE_STRING obfDereferenceObjectString = RTL_CONSTANT_STRING(ObfDereferenceObjectString);
+		UNICODE_STRING mmMapLockedPagesSpecifyCacheString = RTL_CONSTANT_STRING(MmMapLockedPagesSpecifyCacheString);
+
+		// Get function addresses
+		pPsLookupProcessByProcessId PsLookupProcessByProcessId = (pPsLookupProcessByProcessId)MmGetSystemRoutineAddress(&psLookupProcessByProcessIdString);
+		pKeStackAttachProcess KeStackAttachProcess = (pKeStackAttachProcess)MmGetSystemRoutineAddress(&keStackAttachProcessString);
+		pIoAllocateMdl IoAllocateMdl = (pIoAllocateMdl)MmGetSystemRoutineAddress(&ioAllocateMdlString);
+		pMmProbeAndLockPages MmProbeAndLockPages = (pMmProbeAndLockPages)MmGetSystemRoutineAddress(&mmProbeAndLockPagesString);
+		pKeUnstackDetachProcess KeUnstackDetachProcess = (pKeUnstackDetachProcess)MmGetSystemRoutineAddress(&keUnstackDetachProcessString);
+		pObfDereferenceObject ObfDereferenceObject = (pObfDereferenceObject)MmGetSystemRoutineAddress(&obfDereferenceObjectString);
+		pMmMapLockedPagesSpecifyCache MmMapLockedPagesSpecifyCache = (pMmMapLockedPagesSpecifyCache)MmGetSystemRoutineAddress(&mmMapLockedPagesSpecifyCacheString);
+
+
+		//DbgPrint("IOCTL_CE_MAP_MEMORY\n");
+		//DbgPrint("address %x size %d\n", inp->address, inp->size);
 		ntStatus = STATUS_UNSUCCESSFUL;
 
-		DbgPrint("From PID %d\n", inp->TargetPID);
+		//DbgPrint("From PID %d\n", inp->TargetPID);
 		if (PsLookupProcessByProcessId((PVOID)(UINT_PTR)(inp->TargetPID), &selectedprocess) == STATUS_SUCCESS)
 		{
 			
@@ -297,21 +381,22 @@ __stdcall  HookedDispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 				MmProbeAndLockPages(FromMDL, KernelMode, IoReadAccess);
 
 			KeUnstackDetachProcess(&apc_state);
-			ObDereferenceObject(selectedprocess);
+			ObfDereferenceObject(selectedprocess);
 		}
 
 
 		if (FromMDL)
 		{
-			DbgPrint("FromMDL is valid\n");
+			//DbgPrint("FromMDL is valid\n");
 
 			outp->Address = (UINT64)MmMapLockedPagesSpecifyCache(FromMDL, UserMode, MmWriteCombined, NULL, FALSE, NormalPagePriority);
 			outp->MDL = (UINT64)FromMDL;
 			ntStatus = STATUS_SUCCESS;
 		}
-		else
-			DbgPrint("FromMDL==NULL\n");
-
+		else {
+			//DbgPrint("FromMDL==NULL\n");
+		}
+			
 		break;
 	}
 
@@ -341,16 +426,44 @@ __stdcall  HookedDispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 
 		// Get function addresses
 		pIoCreateDriver IoCreateDriver = (pIoCreateDriver)MmGetSystemRoutineAddress(&ioCreateDriver);
-	
+
 		ntStatus = IoCreateDriver(&driverName, (PDRIVER_INITIALIZE)inp->DriverInitialize);
-		
+
 		//ntStatus = STATUS_SUCCESS;
-		DbgPrint("IoCreateDriver at 0x%p \n", IoCreateDriver);
-		DbgPrint("IoCreateDriver(%ls, 0x%p) = %lx\n", driverName.Buffer, inp->DriverInitialize, ntStatus);
-		
+		//DbgPrint("IoCreateDriver at 0x%p \n", IoCreateDriver);
+		//DbgPrint("IoCreateDriver(%ls, 0x%p) = %lx\n", driverName.Buffer, inp->DriverInitialize, ntStatus);
 		break;
 	}
 
+
+	case IOCTL_CE_EXECUTE_CODE:
+	{
+		typedef NTSTATUS(__stdcall* PARAMETERLESSFUNCTION)(UINT64 parameters);
+		PARAMETERLESSFUNCTION functiontocall;
+
+		struct input
+		{
+			UINT64	functionaddress; //function address to call
+			UINT64	parameters;
+		} *inp = (input*)Irp->AssociatedIrp.SystemBuffer;
+		DbgPrint("IOCTL_CE_EXECUTE_CODE\n");
+
+		functiontocall = (PARAMETERLESSFUNCTION)(UINT_PTR)(inp->functionaddress);
+
+		__try
+		{
+			ntStatus = functiontocall(inp->parameters);
+			DbgPrint("Still alive\n");
+			ntStatus = STATUS_SUCCESS;
+		}
+		__except (1)
+		{
+			DbgPrint("Exception occured\n");
+			ntStatus = STATUS_UNSUCCESSFUL;
+		}
+
+		break;
+	}
 
 	default:
 		ntStatus = STATUS_INVALID_DEVICE_REQUEST;
@@ -370,7 +483,7 @@ __stdcall  HookedDispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 		IoCompleteRequest(Irp, IO_NO_INCREMENT);
 	}
 
-	DbgPrint("Return Hooked DispatchIoctl ntStatus: 0x%x\n", ntStatus);
+	//DbgPrint("Return Hooked DispatchIoctl ntStatus: 0x%x\n", ntStatus);
 
 	return ntStatus;
 }

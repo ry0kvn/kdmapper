@@ -346,6 +346,12 @@ BOOL kdmapper_ce::MapDriver(HANDLE dbk64_device_handle, HANDLE hDriver, NTSTATUS
 
     const uint64_t address_of_entry_point = (uint64_t)KernelBuf + ntHeaders->OptionalHeader.AddressOfEntryPoint;
 
+    //Log("Calling DriverEntry 0x%p", address_of_entry_point);
+    //if (!kdmapper_ce::CallDriverEntry(dbk64_device_handle, address_of_entry_point)) {
+    //    Error("Failed to call driver entry");
+    //    break;
+    //}
+
     Log("Calling DriverEntry 0x%p", address_of_entry_point);       
     if (!kdmapper_ce::CreateDriverObject(dbk64_device_handle, address_of_entry_point, L"\\Driver\\TDLD")) {
         Error("CreateDriverObject failed");
@@ -359,12 +365,28 @@ BOOL kdmapper_ce::MapDriver(HANDLE dbk64_device_handle, HANDLE hDriver, NTSTATUS
     return status;
 }
 
+bool kdmapper_ce::CallDriverEntry(HANDLE hDevice, UINT64 EntryPoint) {
 
+    auto ioCtlCode = IOCTL_CE_EXECUTE_CODE;
+    DWORD returned;
+
+    struct input
+    {
+        UINT64	functionaddress;
+        UINT64	parameters;
+    }inp = { EntryPoint, NULL };
+
+    if (DeviceIoControl(hDevice, ioCtlCode, &inp, sizeof input, nullptr, 0, &returned, nullptr))
+        return TRUE;
+    else
+        return FALSE;
+
+}
 bool kdmapper_ce::CreateDriverObject(HANDLE hDevice, UINT64 EntryPoint, PCWSTR driverName) {
 
     auto ioCtlCode = IOCTL_CREATE_DRIVER;
     DWORD returned;
-    UINT64 pMmGetSystemRoutineAddress = (UINT64)GetSystemProcAddress(hDevice, L"MmGetSystemRoutineAddress");
+    UINT64 pMmGetSystemRoutineAddress = (UINT64)GetSystemProcAddressAddress(hDevice);
 
     struct input
     {
@@ -389,7 +411,7 @@ UINT64 kdmapper_ce::AllocateNonPagedMem(HANDLE hDevice,  SIZE_T Size) {
     auto ioCtlCode = IOCTL_ALLOCATEMEM_NONPAGED;
     DWORD bytesReturned = 0;
     BOOL bRc = FALSE;
-    UINT64 pMmGetSystemRoutineAddress = (UINT64)GetSystemProcAddress(hDevice, L"MmGetSystemRoutineAddress");
+    UINT64 pMmGetSystemRoutineAddress = (UINT64)GetSystemProcAddressAddress(hDevice);
 
     struct input
     {
@@ -415,13 +437,16 @@ BOOL kdmapper_ce::CreateSharedMemory(HANDLE hDevice, UINT64 kernelBuf, UINT64* s
     auto ioCtlCode = IOCTL_MAP_MEMORY;
     DWORD bytesReturned = 0;
     BOOL bRc = FALSE;
+    UINT64 pMmGetSystemRoutineAddress = (UINT64)GetSystemProcAddressAddress(hDevice);
 
     struct input
     {
+        UINT64 MmGetSystemRoutineAddress;
         UINT64 TargetPID;
         UINT64 address;
         DWORD size;
-    } inp = { 
+    } inp = {
+        pMmGetSystemRoutineAddress,
         GetCurrentProcessId(),
         kernelBuf,
         bufSize
@@ -454,12 +479,14 @@ BOOL kdmapper_ce::UnMapSharedMemory(HANDLE hDevice, UINT64 sharedMemAddress, UIN
     auto ioCtlCode = IOCTL_UNMAP_MEMORY;
     DWORD bytesReturned = 0;
     BOOL bRc = FALSE;
+    UINT64 pMmGetSystemRoutineAddress = (UINT64)GetSystemProcAddressAddress(hDevice);
 
     struct input
     {
+        UINT64 MmGetSystemRoutineAddress;
         UINT64 MDL;
         UINT64 Address;
-    } inp = {Mdl, sharedMemAddress };
+    } inp = { pMmGetSystemRoutineAddress, Mdl, sharedMemAddress };
     
     bRc = DeviceIoControl(hDevice,
         (DWORD)ioCtlCode,
@@ -569,8 +596,11 @@ PVOID kdmapper_ce::GetSystemProcAddress(HANDLE hDevice, PCWSTR functionName) {
         &bytesReturned,
         NULL
     );
-
-    return (PVOID)inp.MmGetSystemRoutineAddress;
+    
+    if (bRc)
+        return (PVOID)inp.MmGetSystemRoutineAddress;
+    else
+        return FALSE;
 }
 
 BOOL kdmapper_ce::PatchMajorFunction(HANDLE dbk64_device_handle)
@@ -631,7 +661,7 @@ BOOL kdmapper_ce::PatchMajorFunction(HANDLE dbk64_device_handle)
         // Change per PIS
         USHORT returnedDataMaxSize = sizeof(ULONG);
 
-        LPVOID pMmGetSystemRoutineAddress = GetSystemProcAddress(dbk64_device_handle, L"MmGetSystemRoutineAddress");
+        LPVOID pMmGetSystemRoutineAddress = GetSystemProcAddressAddress(dbk64_device_handle);
         LPVOID ReturnedDataAddress = (LPVOID)AllocateNonPagedMem(dbk64_device_handle, returnedDataMaxSize);
 
         struct KernelPisParameters
