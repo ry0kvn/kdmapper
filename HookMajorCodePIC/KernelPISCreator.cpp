@@ -3,13 +3,19 @@
 #pragma optimize("", off)
 #pragma strict_gs_check(off)
 
+// headers
+
 #include <ntifs.h>
 #include <minwindef.h>
 #include <wdm.h>
 
+// driver name defines
+
 #define RL_DEVICE_NAME L"\\Device\\KernelPISCreator"
 #define RL_SYM_NAME L"\\??\\KernelPISCreator"
 #define RL_USER_SYM_NAME L"\\\\.\\KernelPISCreator"
+
+// driver ioctl code defines
 
 #define IOCTL_UNKNOWN_BASE					FILE_DEVICE_UNKNOWN
 #define IOCTL_ALLOCATEMEM_NONPAGED    CTL_CODE(IOCTL_UNKNOWN_BASE, 0x800, METHOD_BUFFERED, FILE_ANY_ACCESS)
@@ -19,15 +25,6 @@
 #define IOCTL_UNMAP_MEMORY					CTL_CODE(IOCTL_UNKNOWN_BASE, 0x084e, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
 #define IOCTL_GETPROCADDRESS_ADDRESS		CTL_CODE(IOCTL_UNKNOWN_BASE, 0x0803, METHOD_BUFFERED, FILE_WRITE_ACCESS)
 #define IOCTL_CE_EXECUTE_CODE					CTL_CODE(IOCTL_UNKNOWN_BASE, 0x083c, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
-
-
-
-struct KernelPisParameters
-{
-	LPVOID MmGetSystemRoutineAddress;
-	LPVOID HookFunctionAddress;
-	USHORT dummy2;
-};
 
 // function prototypes
 
@@ -85,6 +82,15 @@ typedef PVOID(__stdcall* pMmMapLockedPagesSpecifyCache)(_Inout_ PMDL MemoryDescr
 	_In_     ULONG BugCheckOnFailure,
 	_In_     ULONG Priority  // MM_PAGE_PRIORITY logically OR'd with MdlMapping*
 	);
+
+// pic parameter structure 
+
+struct KernelPisParameters
+{
+	LPVOID MmGetSystemRoutineAddress;
+	LPVOID HookFunctionAddress;
+	USHORT dummy2;
+};
 
 NTSTATUS CreateClose(PDEVICE_OBJECT DeviceObject, PIRP Irp) {
 	UNREFERENCED_PARAMETER(DeviceObject);
