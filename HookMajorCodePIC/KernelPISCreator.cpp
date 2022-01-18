@@ -23,8 +23,6 @@
 #define IOCTL_GETPROCADDRESS		CTL_CODE(IOCTL_UNKNOWN_BASE, 0x0802, METHOD_BUFFERED, FILE_WRITE_ACCESS)
 #define IOCTL_CREATE_DRIVER		CTL_CODE(IOCTL_UNKNOWN_BASE, 0x0806, METHOD_BUFFERED, FILE_WRITE_ACCESS)
 #define IOCTL_UNMAP_MEMORY					CTL_CODE(IOCTL_UNKNOWN_BASE, 0x084e, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
-#define IOCTL_GETPROCADDRESS_ADDRESS		CTL_CODE(IOCTL_UNKNOWN_BASE, 0x0803, METHOD_BUFFERED, FILE_WRITE_ACCESS)
-#define IOCTL_CE_EXECUTE_CODE					CTL_CODE(IOCTL_UNKNOWN_BASE, 0x083c, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
 
 // function prototypes
 
@@ -156,6 +154,7 @@ __stdcall  HookedDispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 		size_t size;
 		struct input {
 			UINT64 MmGetSystemRoutineAddress;
+			UINT64 IofCompleteRequest;
 			SIZE_T Size;
 		} *inp = (input*)Irp->AssociatedIrp.SystemBuffer;
 
@@ -193,24 +192,6 @@ __stdcall  HookedDispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 			ntStatus = STATUS_SUCCESS;
 			Irp->IoStatus.Information = sizeof UINT_PTR;
 		}
-
-		break;
-	}
-
-	case IOCTL_GETPROCADDRESS_ADDRESS:
-	{
-
-		UINT64 result;
-		struct input {
-			UINT64 MmGetSystemRoutineAddress;
-		}*inp = (input*)Irp->AssociatedIrp.SystemBuffer;
-
-		result = (UINT64)MmGetSystemRoutineAddress;
-		ntStatus = STATUS_SUCCESS;
-
-		RtlCopyMemory(Irp->AssociatedIrp.SystemBuffer, &result, 8);
-
-		Irp->IoStatus.Information = sizeof UINT64;
 
 		break;
 	}
@@ -279,6 +260,7 @@ __stdcall  HookedDispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 		struct input
 		{
 			UINT64 MmGetSystemRoutineAddress;
+			UINT64 IofCompleteRequest;
 			UINT64 MDL;
 			UINT64 Address;
 		} *inp;
@@ -320,6 +302,7 @@ __stdcall  HookedDispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 		struct input
 		{
 			UINT64 MmGetSystemRoutineAddress;
+			UINT64 IofCompleteRequest;
 			UINT64 TargetPID;
 			UINT64 address;
 			DWORD size;
@@ -419,6 +402,7 @@ __stdcall  HookedDispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 
 		struct input {
 			UINT64 MmGetSystemRoutineAddress;
+			UINT64 IofCompleteRequest;
 			UINT64 DriverInitialize;
 			UINT64 driverName;
 		}*inp = (input*)Irp->AssociatedIrp.SystemBuffer;
@@ -445,36 +429,6 @@ __stdcall  HookedDispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 		//ntStatus = STATUS_SUCCESS;
 		//DbgPrint("IoCreateDriver at 0x%p \n", IoCreateDriver);
 		//DbgPrint("IoCreateDriver(%ls, 0x%p) = %lx\n", driverName.Buffer, inp->DriverInitialize, ntStatus);
-		break;
-	}
-
-
-	case IOCTL_CE_EXECUTE_CODE:
-	{
-		typedef NTSTATUS(__stdcall* PARAMETERLESSFUNCTION)(UINT64 parameters);
-		PARAMETERLESSFUNCTION functiontocall;
-
-		struct input
-		{
-			UINT64	functionaddress; //function address to call
-			UINT64	parameters;
-		} *inp = (input*)Irp->AssociatedIrp.SystemBuffer;
-		DbgPrint("IOCTL_CE_EXECUTE_CODE\n");
-
-		functiontocall = (PARAMETERLESSFUNCTION)(UINT_PTR)(inp->functionaddress);
-
-		__try
-		{
-			ntStatus = functiontocall(inp->parameters);
-			DbgPrint("Still alive\n");
-			ntStatus = STATUS_SUCCESS;
-		}
-		__except (1)
-		{
-			DbgPrint("Exception occured\n");
-			ntStatus = STATUS_UNSUCCESSFUL;
-		}
-
 		break;
 	}
 

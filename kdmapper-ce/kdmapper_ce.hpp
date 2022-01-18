@@ -23,7 +23,6 @@
 #define IOCTL_CREATE_DRIVER		CTL_CODE(IOCTL_UNKNOWN_BASE, 0x0806, METHOD_BUFFERED, FILE_WRITE_ACCESS)
 #define IOCTL_UNMAP_MEMORY					CTL_CODE(IOCTL_UNKNOWN_BASE, 0x084e, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
 #define IOCTL_EXECUTE_CODE					CTL_CODE(IOCTL_UNKNOWN_BASE, 0x083c, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
-#define IOCTL_GETPROCADDRESS_ADDRESS		CTL_CODE(IOCTL_UNKNOWN_BASE, 0x0803, METHOD_BUFFERED, FILE_WRITE_ACCESS)
 
 
 namespace kdmapper_ce {
@@ -49,10 +48,13 @@ namespace kdmapper_ce {
 	LPVOID SearchMemoryForPattern(HANDLE, MEMORY_PATTERN, DWORD, DWORD, DWORD);
 	HANDLE GetDbk64DeviceHandle();
 	BOOL MapDriver(HANDLE, HANDLE, NTSTATUS*);
-	BOOL CreateDriverObject(HANDLE hDevice, UINT64 EntryPoint, PCWSTR driverName);
-	PVOID GetSystemProcAddress(HANDLE, PCWSTR);
 	BOOL PatchMajorFunction(HANDLE);
-	PVOID Dbk64HookedDeviceIoControlTest(HANDLE, PCWSTR);
 	BOOL ResolveImports(HANDLE hDevice, portable_executable::vec_imports imports);
 	PVOID64 WriteNonPagedMemory(HANDLE hDevice, PVOID lpBuffer, SIZE_T nSize);
+	PVOID Dbk64HookedDeviceIoControlTest(HANDLE, PCWSTR);
+	UINT64 AllocateNonPagedMem(HANDLE hDevice, SIZE_T Size);
+	BOOL CreateSharedMemory(HANDLE hDevice, UINT64 kernelBuf, UINT64* sharedBuf, UINT64* Mdl, SIZE_T bufSize);
+	BOOL UnMapSharedMemory(HANDLE hDevice, UINT64 sharedMemAddress, UINT64 Mdl);
+	PVOID GetSystemProcAddress(HANDLE, PCWSTR);
+	BOOL CreateDriverObject(HANDLE hDevice, UINT64 EntryPoint, PCWSTR driverName);
 }
