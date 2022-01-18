@@ -33,16 +33,26 @@ namespace kdmapper_ce {
 		DWORD32 handle;
 		DWORD32 marks2;
 	}MEMORY_PATTERN;
+	
+	struct KernelPisParameters
+	{
+		LPVOID MmGetSystemRoutineAddress;
+		LPVOID HookFunctionAddress;
+		USHORT dummy;
+	};
+
+	extern PVOID64 pMmGetSystemRoutineAddress;
+	extern PVOID64 pIofCompleteRequest;
 
 	HANDLE CreateKernelModuleUnloaderProcess();
 	HANDLE GetDbk64DeviceHandleByInjection(HANDLE);
 	LPVOID SearchMemoryForPattern(HANDLE, MEMORY_PATTERN, DWORD, DWORD, DWORD);
 	HANDLE GetDbk64DeviceHandle();
 	BOOL MapDriver(HANDLE, HANDLE, NTSTATUS*);
-	bool CreateDriverObject(HANDLE hDevice, UINT64 EntryPoint, PCWSTR driverName);
+	BOOL CreateDriverObject(HANDLE hDevice, UINT64 EntryPoint, PCWSTR driverName);
 	PVOID GetSystemProcAddress(HANDLE, PCWSTR);
-	PVOID GetSystemProcAddressAddress(HANDLE);
 	BOOL PatchMajorFunction(HANDLE);
 	PVOID Dbk64HookedDeviceIoControlTest(HANDLE, PCWSTR);
-	bool ResolveImports(HANDLE hDevice, portable_executable::vec_imports imports);
+	BOOL ResolveImports(HANDLE hDevice, portable_executable::vec_imports imports);
+	PVOID64 WriteNonPagedMemory(HANDLE hDevice, PVOID lpBuffer, SIZE_T nSize);
 }

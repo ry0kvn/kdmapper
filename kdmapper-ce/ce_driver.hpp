@@ -34,7 +34,7 @@ namespace ce_driver {
 	BOOL CreateSharedMemory(HANDLE, UINT64, UINT64*, UINT64* , SIZE_T);
 	BOOL UnMapSharedMemory(HANDLE, UINT64, UINT64);
 	BOOL ExecuteKernelModeShellCode(HANDLE, UINT64, UINT64);
-	PVOID CEGetSystemProcAddress(HANDLE, PCWSTR);
+	PVOID64 GetSystemProcAddress(HANDLE, PCWSTR);
 	BOOL Dbk64DeviceIoControlTest(HANDLE);
 	bool CallDriverEntry(HANDLE hDevice, UINT64 EntryPoint);
 }

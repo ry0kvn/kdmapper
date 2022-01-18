@@ -206,7 +206,7 @@ BOOL ce_driver::ExecuteKernelModeShellCode(HANDLE hDevice, UINT64 shellcodeAddre
     return bRc;
 }
 
-PVOID ce_driver::CEGetSystemProcAddress(HANDLE hDevice, PCWSTR routineName) {
+PVOID64 ce_driver::GetSystemProcAddress(HANDLE hDevice, PCWSTR routineName) {
     auto ioCtlCode = IOCTL_CE_GETPROCADDRESS;
     DWORD bytesReturned = 0;
     BOOL bRc = FALSE;
@@ -226,7 +226,7 @@ PVOID ce_driver::CEGetSystemProcAddress(HANDLE hDevice, PCWSTR routineName) {
         NULL
     );
 
-    return (PVOID)inp.s;
+    return (PVOID64)inp.s;
 }
 
 BOOL ce_driver::Dbk64DeviceIoControlTest(HANDLE hDevice) {
