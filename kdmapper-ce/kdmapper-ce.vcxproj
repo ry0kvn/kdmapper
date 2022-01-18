@@ -42,6 +42,7 @@
     <ClInclude Include="kdmapper_ce.hpp" />
     <ClInclude Include="kernelmoduleunloader_resource.hpp" />
     <ClInclude Include="kernelmoduleunloader_sig_resource.hpp" />
+    <ClInclude Include="kernel_mode_shellcode_ioctl_resource.hpp" />
     <ClInclude Include="kernel_mode_shellcode_resource.hpp" />
     <ClInclude Include="main.h" />
     <ClInclude Include="pch.h" />
@@ -192,7 +193,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PreBuildEvent>
-      <Command>python.exe $(SolutionDir)shellcode\shellcode_generator.py $(SolutionDir)\Release\shellcode.exe $(ProjectDir) shellcode</Command>
+      <Command>python.exe $(SolutionDir)shellcode\shellcode_generator.py $(OutDir)KernelPISCreator.sys $(ProjectDir) kernel_mode_shellcode
+python.exe $(SolutionDir)shellcode\shellcode_generator.py $(OutDir)KernelPISCreator.sys $(ProjectDir) kernel_mode_shellcode_ioctl</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='experiments|x64'">

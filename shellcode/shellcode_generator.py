@@ -62,15 +62,17 @@ def main(target_file, pic_path, pic_name) -> bool:
         SizeOfRawData = 0x0
         sec_count = 0
         for sec in pe.sections:
-            if sec.Name == b'.PIS\x00\x00\x00\x00':
-                # print(sec)
-                sec_count += 1
+            # print(sec)
+            if sec.Name == b'.PIS2\x00\x00\x00':
                 break
+            else:
+                sec_count += 1
 
         # if (PointerToRawData == 0x0 and SizeOfRawData == 0x0):
         #     print("[!]Couldn't find the PIC")
         #     break
-
+        
+        print(sec)
         print("PIC disk address: 0x%x (%d bytes)" % (sec.PointerToRawData, sec.SizeOfRawData))
         pic_bytearray = pe.sections[sec_count].get_data()
         # pic_bytearray = pe.get_data(PointerToRawData, SizeOfRawData)
