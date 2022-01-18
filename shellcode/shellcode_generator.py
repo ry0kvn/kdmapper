@@ -31,7 +31,7 @@ def split_n(text, n):
     return [ "0x" + text[i*n:i*n+n] + ", " for i in range(int(len(text)/n)) ]
 
 
-def main(target_file, pic_path, pic_name) -> bool:
+def main(target_file, pic_path, pic_name, target_section_name) -> bool:
     status = False
     while True:
         try:
@@ -58,32 +58,31 @@ def main(target_file, pic_path, pic_name) -> bool:
         print("e_magic value: %s" % hex(pe.DOS_HEADER.e_magic))
         print("Signature value: %s" % hex(pe.NT_HEADERS.Signature))
         
-        PointerToRawData = 0x0
-        SizeOfRawData = 0x0
+
+        # PEファイルフォーマットのセクション名は8バイト固定
+        target_sec_name = target_section_name.encode() + b"\x00" * (8- len(target_section_name))
         sec_count = 0
         for sec in pe.sections:
             # print(sec)
-            if sec.Name == b'.PIS2\x00\x00\x00':
+            if sec.Name == target_sec_name:
                 break
             else:
                 sec_count += 1
 
-        # if (PointerToRawData == 0x0 and SizeOfRawData == 0x0):
-        #     print("[!]Couldn't find the PIC")
-        #     break
+        if (sec.PointerToRawData == 0x0 or sec.SizeOfRawData == 0x0):
+            print("[!]Couldn't find the PIC")
+            break
         
         print(sec)
         print("PIC disk address: 0x%x (%d bytes)" % (sec.PointerToRawData, sec.SizeOfRawData))
-        pic_bytearray = pe.sections[sec_count].get_data()
+
         # pic_bytearray = pe.get_data(PointerToRawData, SizeOfRawData)
+        pic_bytearray = pe.sections[sec_count].get_data()
         
         pic_hexadecimal_string = pic_bytearray.hex()
 
         # 0x48, 0x89, 0x4C, 0x24, のようなフォーマットに変換
         pic_array = split_n(pic_hexadecimal_string, 2)
-
-        # 最初のret命令を検索
-        ind = pic_array.index("0xc3, ")
 
         # 最後のret命令を検索
         target_value = "0xc3, "
@@ -98,7 +97,7 @@ def main(target_file, pic_path, pic_name) -> bool:
         # ret命令以降は不要なので削除
         del pic_array[del_index::]
 
-        # 16 bytesでalignment. 
+        # 16bytesでalignment. 
         # 0xccで埋める
         size = len(pic_array)
         align_count = 16 - size % 16
@@ -118,7 +117,7 @@ def main(target_file, pic_path, pic_name) -> bool:
         f_header = file_header % (pic_name, pic_name)
         pic_output_path = pic_path + pic_name + '_resource.hpp'
         # .hppとしてファイルに出力
-        with open(pic_output_path, 'w') as f:
+        with open(pic_output_path, 'w', encoding='utf-8') as f:
             f.write(f_header)
             f.writelines(pic_array)
             f.write(file_footer)
@@ -140,12 +139,13 @@ if __name__ == '__main__':
     target_pe_path = sys.argv[1] 
     output_dir_path = sys.argv[2]
     output_pic_name = sys.argv[3]
+    target_section_name = sys.argv[4]
     
     print("target_pe_path %s" % target_pe_path)
     print("output_dir_path %s" % output_dir_path)
     print("output_pic_name %s" % output_pic_name)
 
-    res = main(target_pe_path, output_dir_path, output_pic_name)
+    res = main(target_pe_path, output_dir_path, output_pic_name, target_section_name)
     if not res:
         print('[!]PIC generation process failed')
     

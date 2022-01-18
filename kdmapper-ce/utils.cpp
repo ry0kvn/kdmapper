@@ -18,6 +18,8 @@ bool utils::CreateFileFromMemory(const std::wstring& desired_file_path, const ch
 	
 	std::ofstream file_ofstream(desired_file_path.c_str(), std::ios_base::out | std::ios_base::binary);
 
+	_wremove(desired_file_path.c_str());
+
 	if (!file_ofstream.write(address, size)) {
 		file_ofstream.close();
 		return false;

@@ -13,16 +13,7 @@
 #include "kernel_mode_shellcode_resource.hpp"
 #include "kernel_mode_shellcode_ioctl_resource.hpp"
 #include "portable_executable.hpp"
-
-
-#define IOCTL_UNKNOWN_BASE					FILE_DEVICE_UNKNOWN
-#define IOCTL_CE_TEST							CTL_CODE(IOCTL_UNKNOWN_BASE, 0x0804, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
-#define IOCTL_CE_ALLOCATEMEM_NONPAGED			CTL_CODE(IOCTL_UNKNOWN_BASE, 0x0826, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
-#define IOCTL_CE_MAP_MEMORY						CTL_CODE(IOCTL_UNKNOWN_BASE, 0x084d, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
-#define IOCTL_CE_UNMAP_MEMORY					CTL_CODE(IOCTL_UNKNOWN_BASE, 0x084e, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
-#define IOCTL_CE_EXECUTE_CODE					CTL_CODE(IOCTL_UNKNOWN_BASE, 0x083c, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
-
-#define IOCTL_CE_GETPROCADDRESS					CTL_CODE(IOCTL_UNKNOWN_BASE, 0x0827, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
+#include "ce_driver.hpp"
 
 
 #define IOCTL_UNKNOWN_BASE					FILE_DEVICE_UNKNOWN
@@ -48,17 +39,10 @@ namespace kdmapper_ce {
 	LPVOID SearchMemoryForPattern(HANDLE, MEMORY_PATTERN, DWORD, DWORD, DWORD);
 	HANDLE GetDbk64DeviceHandle();
 	BOOL MapDriver(HANDLE, HANDLE, NTSTATUS*);
-	bool CallDriverEntry(HANDLE hDevice, UINT64 EntryPoint);
 	bool CreateDriverObject(HANDLE hDevice, UINT64 EntryPoint, PCWSTR driverName);
-	UINT64 AllocateNonPagedMem(HANDLE, SIZE_T);
-	BOOL CreateSharedMemory(HANDLE, UINT64, UINT64*, UINT64*, SIZE_T);
-	BOOL UnMapSharedMemory(HANDLE, UINT64, UINT64);
-	BOOL ExecuteKernelModeShellCode(HANDLE, UINT64, UINT64);
-	BOOL Dbk64DeviceIoControlTest(HANDLE);
 	PVOID GetSystemProcAddress(HANDLE, PCWSTR);
 	PVOID GetSystemProcAddressAddress(HANDLE);
 	BOOL PatchMajorFunction(HANDLE);
 	PVOID Dbk64HookedDeviceIoControlTest(HANDLE, PCWSTR);
-	PVOID CEGetSystemProcAddress(HANDLE hDevice, PCWSTR routineName);
 	bool ResolveImports(HANDLE hDevice, portable_executable::vec_imports imports);
 }
