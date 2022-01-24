@@ -30,7 +30,6 @@
     <ClCompile Include="ce_driver.cpp" />
     <ClCompile Include="kdmapper_ce.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="pch.cpp" />
     <ClCompile Include="portable_executable.cpp" />
     <ClCompile Include="service.cpp" />
     <ClCompile Include="utils.cpp" />
@@ -38,14 +37,12 @@
   <ItemGroup>
     <ClInclude Include="ce_driver.hpp" />
     <ClInclude Include="dbk64_driver_resource.hpp" />
-    <ClInclude Include="helloworld_driver_resource.hpp" />
     <ClInclude Include="kdmapper_ce.hpp" />
     <ClInclude Include="kernelmoduleunloader_resource.hpp" />
     <ClInclude Include="kernelmoduleunloader_sig_resource.hpp" />
     <ClInclude Include="kernel_mode_shellcode_ioctl_resource.hpp" />
     <ClInclude Include="kernel_mode_shellcode_resource.hpp" />
     <ClInclude Include="main.h" />
-    <ClInclude Include="pch.h" />
     <ClInclude Include="portable_executable.hpp" />
     <ClInclude Include="resources\dbk64_driver_resource.hpp" />
     <ClInclude Include="service.hpp" />

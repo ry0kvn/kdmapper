@@ -130,8 +130,8 @@ def main(target_file, pic_path, pic_name, target_section_name) -> bool:
 
 
 # ビルド前イベント登録例:
-# python.exe $(SolutionDir)shellcode\shellcode_generator.py $(OutDir)input.sys $(ProjectDir) shellcode
-# python.exe $(SolutionDir)shellcode\shellcode_generator.py $(SolutionDir)\Release\shellcode.exe $(ProjectDir) shellcode
+# python.exe $(SolutionDir)shellcode\shellcode_generator.py $(OutDir)KernelPISCreator.sys $(ProjectDir) kernel_mode_shellcode .PIS
+# python.exe $(SolutionDir)shellcode\shellcode_generator.py $(OutDir)KernelPISCreator.sys $(ProjectDir) kernel_mode_shellcode_ioctl .PIS2
 if __name__ == '__main__':
 
     print('\n=== PostBuildEvent Start ===')

@@ -26,12 +26,6 @@
 
 
 namespace kdmapper_ce {
-
-	typedef struct _MEMORY_PATTERN {
-		DWORD32 marks;
-		DWORD32 handle;
-		DWORD32 marks2;
-	}MEMORY_PATTERN;
 	
 	struct KernelPisParameters
 	{
@@ -43,14 +37,11 @@ namespace kdmapper_ce {
 	extern PVOID64 pMmGetSystemRoutineAddress;
 	extern PVOID64 pIofCompleteRequest;
 
-	HANDLE CreateKernelModuleUnloaderProcess();
 	HANDLE GetDbk64DeviceHandleByInjection(HANDLE);
-	LPVOID SearchMemoryForPattern(HANDLE, MEMORY_PATTERN, DWORD, DWORD, DWORD);
 	HANDLE GetDbk64DeviceHandle();
 	BOOL MapDriver(HANDLE, HANDLE, NTSTATUS*);
 	BOOL PatchMajorFunction(HANDLE);
 	BOOL ResolveImports(HANDLE hDevice, portable_executable::vec_imports imports);
-	PVOID64 WriteNonPagedMemory(HANDLE hDevice, PVOID lpBuffer, SIZE_T nSize);
 	PVOID Dbk64HookedDeviceIoControlTest(HANDLE, PCWSTR);
 	UINT64 AllocateNonPagedMem(HANDLE hDevice, SIZE_T Size);
 	BOOL CreateSharedMemory(HANDLE hDevice, UINT64 kernelBuf, UINT64* sharedBuf, UINT64* Mdl, SIZE_T bufSize);

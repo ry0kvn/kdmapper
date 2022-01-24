@@ -8,10 +8,13 @@
 #include "service.hpp"
 
 #if _DEBUG
-#include "helloworld_driver_resource.hpp"
+
 #include "test_dbk64_driver_resource.hpp"
+
 #else
+
 #include "dbk64_driver_resource.hpp"
+
 #endif
 
 #define IOCTL_UNKNOWN_BASE					FILE_DEVICE_UNKNOWN
@@ -37,4 +40,5 @@ namespace ce_driver {
 	PVOID64 GetSystemProcAddress(HANDLE, PCWSTR);
 	BOOL Dbk64DeviceIoControlTest(HANDLE);
 	bool CallDriverEntry(HANDLE hDevice, UINT64 EntryPoint);
+	PVOID64 WriteNonPagedMemory(HANDLE hDevice, PVOID lpBuffer, SIZE_T nSize);
 }

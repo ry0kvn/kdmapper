@@ -2,7 +2,6 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="pch.cpp" />
     <ClCompile Include="utils.cpp" />
     <ClCompile Include="ce_driver.cpp" />
     <ClCompile Include="service.cpp" />
@@ -11,14 +10,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="kdmapper_ce.hpp" />
-    <ClInclude Include="pch.h" />
     <ClInclude Include="dbk64_driver_resource.hpp" />
     <ClInclude Include="kernelmoduleunloader_resource.hpp" />
     <ClInclude Include="utils.hpp" />
     <ClInclude Include="ce_driver.hpp" />
     <ClInclude Include="main.h" />
     <ClInclude Include="service.hpp" />
-    <ClInclude Include="helloworld_driver_resource.hpp" />
     <ClInclude Include="test_dbk64_driver_resource.hpp" />
     <ClInclude Include="kernelmoduleunloader_sig_resource.hpp" />
     <ClInclude Include="shellcode_resource.hpp" />

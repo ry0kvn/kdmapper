@@ -10,7 +10,7 @@ bool service::RegisterAndStart(const std::wstring& driver_path) {
 	HKEY dservice;
 	LSTATUS status = RegCreateKeyW(HKEY_LOCAL_MACHINE, servicesPath.c_str(), &dservice); //Returns Ok if already exists
 	if (status != ERROR_SUCCESS) {
-		Log("[-] Can't create service key");
+		Error("Can't create service key");
 		return false;
 	}
 	Log("Create service %ls", servicesPath.c_str());
@@ -18,14 +18,14 @@ bool service::RegisterAndStart(const std::wstring& driver_path) {
 	status = RegSetKeyValueW(dservice, NULL, L"ImagePath", REG_EXPAND_SZ, nPath.c_str(), (DWORD)(nPath.size() * sizeof(wchar_t)));
 	if (status != ERROR_SUCCESS) {
 		RegCloseKey(dservice);
-		Log("[-] Can't create 'ImagePath' registry value");
+		Error("Can't create 'ImagePath' registry value");
 		return false;
 	}
 
 	status = RegSetKeyValueW(dservice, NULL, L"Type", REG_DWORD, &ServiceTypeKernel, sizeof(DWORD));
 	if (status != ERROR_SUCCESS) {
 		RegCloseKey(dservice);
-		Log("[-] Can't create 'Type' registry value");
+		Error("Can't create 'Type' registry value");
 		return false;
 	}
 
@@ -33,7 +33,7 @@ bool service::RegisterAndStart(const std::wstring& driver_path) {
 	status = RegSetValueEx(dservice, L"Start", 0, REG_DWORD, (BYTE*)&dwType, sizeof(DWORD));
 	if (status != ERROR_SUCCESS) {
 		RegCloseKey(dservice);
-		Log("[-] Can't create 'Type' registry value");
+		Error("Can't create 'Type' registry value");
 		return false;
 	}
 
@@ -50,25 +50,25 @@ bool service::RegisterAndStart(const std::wstring& driver_path) {
 	status = RegSetKeyValueW(dservice, NULL, L"A", REG_SZ, (LPBYTE)valeuA.c_str(), (DWORD)(valeuA.size() * sizeof(wchar_t)));
 	if (status != ERROR_SUCCESS) {
 		RegCloseKey(dservice);
-		Log("[-] Can't create 'Type' registry value");
+		Error("Can't create 'Type' registry value");
 		return false;
 	}
 	status = RegSetKeyValueW(dservice, NULL, L"B", REG_SZ, (LPBYTE)valeuB.c_str(), (DWORD)(valeuB.size() * sizeof(wchar_t)));
 	if (status != ERROR_SUCCESS) {
 		RegCloseKey(dservice);
-		Log("[-] Can't create 'Type' registry value");
+		Error("Can't create 'Type' registry value");
 		return false;
 	}
 	status = RegSetKeyValueW(dservice, NULL, L"C", REG_SZ, (LPBYTE)valeuC.c_str(), (DWORD)(valeuC.size() * sizeof(wchar_t)));
 	if (status != ERROR_SUCCESS) {
 		RegCloseKey(dservice);
-		Log("[-] Can't create 'Type' registry value");
+		Error("Can't create 'Type' registry value");
 		return false;
 	}
 	status = RegSetKeyValueW(dservice, NULL, L"D", REG_SZ, (LPBYTE)valeuD.c_str(), (DWORD)(valeuD.size() * sizeof(wchar_t)));
 	if (status != ERROR_SUCCESS) {
 		RegCloseKey(dservice);
-		Log("[-] Can't create 'Type' registry value");
+		Error("Can't create 'Type' registry value");
 		return false;
 	}
 	/////////////////////////////////////////
@@ -87,7 +87,7 @@ bool service::RegisterAndStart(const std::wstring& driver_path) {
 	BOOLEAN SeLoadDriverWasEnabled;
 	NTSTATUS Status = RtlAdjustPrivilege(SE_LOAD_DRIVER_PRIVILEGE, TRUE, FALSE, &SeLoadDriverWasEnabled);
 	if (!NT_SUCCESS(Status)) {
-		Log("Fatal error: failed to acquire SE_LOAD_DRIVER_PRIVILEGE. Make sure you are running as administrator.");
+		Error("Fatal error: failed to acquire SE_LOAD_DRIVER_PRIVILEGE. Make sure you are running as administrator.");
 		return false;
 	}
 	std::wstring ServiceName = ce_driver::GetDriverNameW();
@@ -104,7 +104,7 @@ bool service::RegisterAndStart(const std::wstring& driver_path) {
 
 	Status = NtLoadDriver(&serviceStr);
 #ifdef _DEBUG
-	Log("NtLoadDriver Status 0x%x", Status);
+	Log2("NtLoadDriver Status 0x%x", Status);
 #endif // DEBUG
 
 	//Never should occur since kdmapper checks for "IsRunning" driver before
@@ -151,10 +151,10 @@ bool service::StopAndRemove(const std::wstring& driver_name) {
 	if (st != 0x0) {
 
 #ifdef _DEBUG
-		Log("NtUnloadDriver Status 0x%x", st);
+		Log2("NtUnloadDriver Status 0x%x", st);
 #endif // _DEBUG
 
-		Log("Driver Unload Failed!!");
+		Error("Driver Unload Failed!!");
 		status = RegDeleteKeyW(HKEY_LOCAL_MACHINE, servicesPath.c_str());
 		return false; //lets consider unload fail as error because can cause problems with anti cheats later
 	}

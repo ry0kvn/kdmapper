@@ -6,7 +6,7 @@ int wmain(const int argc, wchar_t** argv) {
 	utils::KdmapperInit();
 
 #if _DEBUG
-	Log("Debug Mode Enable");
+	Log2("Debug Mode Enable");
 #endif
 
 	wchar_t DriverFullPath[MAX_PATH] = { 0 };
@@ -67,10 +67,13 @@ int wmain(const int argc, wchar_t** argv) {
 			break;
 		}
 
-#ifdef _DEBUG
-		Log("exitCode: %d", exitCode);
-#endif // _DEBUG
-
+		if (NT_SUCCESS(exitCode)) {
+			Log("Successfully executed driver entry (exitCode: %d)", exitCode);
+		}
+		else {
+			Error("Failed to execute driver entry (exitCode: %d)", exitCode);
+		}
+		
 	} while (FALSE);
 
 
