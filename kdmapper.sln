@@ -7,9 +7,9 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "kdmapper", "kdmapper\kdmapp
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "kdmapper-ce", "kdmapper-ce\kdmapper-ce.vcxproj", "{8999B748-3F31-494D-958E-41B839AB7E5D}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UserPISCreator", "shellcode\shellcode.vcxproj", "{137E5ED4-A847-4B07-B0C6-124D78054482}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UserPISCreator", "UserPISCreator\UserPISCreator.vcxproj", "{137E5ED4-A847-4B07-B0C6-124D78054482}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "KernelPISCreator", "HookMajorCodePIC\HookMajorCodePIC.vcxproj", "{CD646EE8-C72B-4E72-ACE6-034A2EE63275}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "KernelPISCreator", "KernelPISCreator\KernelPISCreator.vcxproj", "{CD646EE8-C72B-4E72-ACE6-034A2EE63275}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

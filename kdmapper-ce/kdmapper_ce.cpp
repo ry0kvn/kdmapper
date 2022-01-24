@@ -11,9 +11,11 @@ HANDLE kdmapper_ce::GetDbk64DeviceHandleByInjection(HANDLE hTargetProcess) {
     HANDLE threadHijacked = NULL;
     HANDLE targetThread = NULL;
     HANDLE snapshot;
+    HANDLE remoteShellcodeBuffer = NULL;
     THREADENTRY32 threadEntry;
     CONTEXT context;
     DWORD targetProcessID = GetProcessId(hTargetProcess);
+    SIZE_T shellcode_size = 0;
 
     context.ContextFlags = CONTEXT_FULL;
     threadEntry.dwSize = sizeof(THREADENTRY32);
@@ -40,9 +42,9 @@ HANDLE kdmapper_ce::GetDbk64DeviceHandleByInjection(HANDLE hTargetProcess) {
 
     // inject shellcode
 
-    SIZE_T shellcode_size = sizeof shellcode_resource::shellcode;
+    shellcode_size = sizeof shellcode_resource::shellcode;
 
-    HANDLE remoteShellcodeBuffer = VirtualAllocEx(hTargetProcess, NULL, shellcode_size, (MEM_RESERVE | MEM_COMMIT), PAGE_EXECUTE_READWRITE);
+    remoteShellcodeBuffer = VirtualAllocEx(hTargetProcess, NULL, shellcode_size, (MEM_RESERVE | MEM_COMMIT), PAGE_EXECUTE_READWRITE);
     if (remoteShellcodeBuffer == NULL) {
         Error("VirtualAllocEx failed");
         return hDevice;
@@ -53,6 +55,8 @@ HANDLE kdmapper_ce::GetDbk64DeviceHandleByInjection(HANDLE hTargetProcess) {
     // hijack the main thread of kernelmoduleunloader
 
     WOW64_CONTEXT ct32;
+    utils::MEMORY_PATTERN  pattern = { 0x12345678, NULL, 0x12345678 };
+
     ZeroMemory(&ct32, sizeof(PWOW64_CONTEXT));
 
     Wow64SuspendThread(targetThread);
@@ -69,7 +73,6 @@ HANDLE kdmapper_ce::GetDbk64DeviceHandleByInjection(HANDLE hTargetProcess) {
 
     // search for patterns in kernelmoduleunloader.exe process memory
 
-    utils::MEMORY_PATTERN  pattern = { 0x12345678, NULL, 0x12345678 };
 
     utils::MEMORY_PATTERN* tmp_pattern = (utils::MEMORY_PATTERN*)utils::SearchProcessMemoryForPattern(
         hTargetProcess,
@@ -92,6 +95,7 @@ HANDLE kdmapper_ce::GetDbk64DeviceHandle()
 {
     HANDLE hDbk64 = INVALID_HANDLE_VALUE;
     HANDLE hKernelModuleUnloader = INVALID_HANDLE_VALUE;
+    HANDLE hOriginalDbk64 = INVALID_HANDLE_VALUE;
 
     hKernelModuleUnloader = utils::CreateKernelModuleUnloaderProcess();
     if (hKernelModuleUnloader == INVALID_HANDLE_VALUE) {
@@ -105,7 +109,7 @@ HANDLE kdmapper_ce::GetDbk64DeviceHandle()
 
     // Inject the shellcode into the KernelModuleUnloader.exe process to get the device handle of dbk64.sys.
 
-    HANDLE hOriginalDbk64 = GetDbk64DeviceHandleByInjection(hKernelModuleUnloader);
+    hOriginalDbk64 = GetDbk64DeviceHandleByInjection(hKernelModuleUnloader);
     if (hOriginalDbk64 == INVALID_HANDLE_VALUE || hOriginalDbk64 == NULL || hOriginalDbk64 == (HANDLE)0xffffffff) {
         Error("GetDbk64DeviceHandleByInjection failed");
         TerminateProcess(hKernelModuleUnloader, 0);
@@ -136,6 +140,17 @@ HANDLE kdmapper_ce::GetDbk64DeviceHandle()
 BOOL kdmapper_ce::MapDriver(HANDLE dbk64_device_handle, HANDLE hDriver, NTSTATUS* exitCode)
 {
 
+    BOOL status = FALSE;
+    PIMAGE_NT_HEADERS64 ntHeaders = NULL;
+    PIMAGE_SECTION_HEADER section = NULL;
+    uint32_t ImageSize = 0;
+    UINT64 KernelBuf = NULL;
+    VOID* SharedBuf = NULL;
+    UINT64 Mdl = NULL;
+    DWORD_PTR deltaImageBase = NULL;
+    uint64_t address_of_entry_point = NULL;
+    PCWSTR DriverObjectName = L"\\Driver\\TDLD";
+
     // Testing the Patched IOCTL routine 
 #ifdef _DEBUG
     if (!Dbk64HookedDeviceIoControlTest(dbk64_device_handle, L"MmGetSystemRoutineAddress")) {
@@ -144,13 +159,11 @@ BOOL kdmapper_ce::MapDriver(HANDLE dbk64_device_handle, HANDLE hDriver, NTSTATUS
     }
 #endif // _DEBUG
 
-    BOOL status = FALSE;
-
     do {
 
       // .sys ファイルをパース
 
-        const PIMAGE_NT_HEADERS64 ntHeaders = portable_executable::GetNtHeaders(hDriver);
+        ntHeaders = portable_executable::GetNtHeaders(hDriver);
 
         if (!ntHeaders) {
             Error("Invalid format of PE image");
@@ -165,18 +178,15 @@ BOOL kdmapper_ce::MapDriver(HANDLE dbk64_device_handle, HANDLE hDriver, NTSTATUS
         Log("Validity of the inputted driver: Valid");
         Log("Map the input driver to kernel space...");
 
-        uint32_t ImageSize = ntHeaders->OptionalHeader.SizeOfImage;
+        ImageSize = ntHeaders->OptionalHeader.SizeOfImage;
 
-        UINT64 KernelBuf = AllocateNonPagedMem(dbk64_device_handle, ImageSize);
+        KernelBuf = AllocateNonPagedMem(dbk64_device_handle, ImageSize);
         if (KernelBuf == NULL) {
             Error("AllocateNoPagedMem failed");
             break;
         }
 
         // Create an MDL for the buffer allocated above and make it accessible from user space
-
-        VOID* SharedBuf = NULL;
-        UINT64 Mdl = NULL;
 
         if (!CreateSharedMemory(dbk64_device_handle, KernelBuf, (UINT64*)&SharedBuf, &Mdl, ImageSize)) {
             Error("CreateSharedMemory failed");
@@ -191,7 +201,7 @@ BOOL kdmapper_ce::MapDriver(HANDLE dbk64_device_handle, HANDLE hDriver, NTSTATUS
 
         // Copy image sections
 
-        PIMAGE_SECTION_HEADER section = IMAGE_FIRST_SECTION(ntHeaders);
+        section = IMAGE_FIRST_SECTION(ntHeaders);
         for (auto i = 0; i < ntHeaders->FileHeader.NumberOfSections; i++)
         {
             if ((section->Characteristics & IMAGE_SCN_CNT_UNINITIALIZED_DATA) > 0)
@@ -205,7 +215,7 @@ BOOL kdmapper_ce::MapDriver(HANDLE dbk64_device_handle, HANDLE hDriver, NTSTATUS
 
         // Resolve relocs and imports
 
-        DWORD_PTR deltaImageBase = (DWORD_PTR)KernelBuf - (DWORD_PTR)ntHeaders->OptionalHeader.ImageBase;
+        deltaImageBase = (DWORD_PTR)KernelBuf - (DWORD_PTR)ntHeaders->OptionalHeader.ImageBase;
         portable_executable::RelocateImageByDelta(portable_executable::GetRelocs((VOID*)SharedBuf), deltaImageBase);
 
         if (!ResolveImports(dbk64_device_handle, portable_executable::GetImports(SharedBuf))) {
@@ -224,8 +234,7 @@ BOOL kdmapper_ce::MapDriver(HANDLE dbk64_device_handle, HANDLE hDriver, NTSTATUS
 
         // Call driver entry point
 
-        const uint64_t address_of_entry_point = (uint64_t)KernelBuf + ntHeaders->OptionalHeader.AddressOfEntryPoint;
-        PCWSTR DriverObjectName = L"\\Driver\\TDLD";
+        address_of_entry_point = (uint64_t)KernelBuf + ntHeaders->OptionalHeader.AddressOfEntryPoint;
 
         Log("Create DriverObjectName : %ls", DriverObjectName);
         if (!kdmapper_ce::CreateDriverObject(dbk64_device_handle, address_of_entry_point, DriverObjectName)) {
