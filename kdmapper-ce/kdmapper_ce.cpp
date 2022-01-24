@@ -54,40 +54,46 @@ HANDLE kdmapper_ce::GetDbk64DeviceHandleByInjection(HANDLE hTargetProcess) {
 
     // hijack the main thread of kernelmoduleunloader
 
-    WOW64_CONTEXT ct32;
-    utils::MEMORY_PATTERN  pattern = { 0x12345678, NULL, 0x12345678 };
+    WOW64_CONTEXT ct32 = { 0 };
+    ct32.ContextFlags = CONTEXT_ALL;  // TODO
+    UserPisParameters pisParameters;
+    pisParameters.Handle = NULL;
+    wchar_t symbol_name[] = L"\\\\.\\EvilCEDRIVER73";
 
-    ZeroMemory(&ct32, sizeof(PWOW64_CONTEXT));
+    memcpy(pisParameters.SymName, symbol_name, sizeof symbol_name);
+
+    // Allocate a buffer for shellcode parameters
+
+    HANDLE remoteShellcodeParamBuf = VirtualAllocEx(hTargetProcess, NULL, sizeof UserPisParameters, (MEM_RESERVE | MEM_COMMIT), PAGE_READWRITE);
+    if (remoteShellcodeParamBuf == NULL) {
+        Error("VirtualAllocEx failed");
+        return hDevice;
+    }
+
+    // Copy the shellcode parameters
+
+    WriteProcessMemory(hTargetProcess, remoteShellcodeParamBuf, &pisParameters, sizeof UserPisParameters, NULL);
+
+    // Set Eip to the address of the parameter. 
+    // Set Eip to the address of the shellcode.
 
     Wow64SuspendThread(targetThread);
-
-    ct32.ContextFlags = CONTEXT_CONTROL;
     Wow64GetThreadContext(targetThread, &ct32);
 
+    ct32.Ecx = (DWORD)remoteShellcodeParamBuf;
     ct32.Eip = (DWORD)remoteShellcodeBuffer;
-
+    
     Wow64SetThreadContext(targetThread, &ct32);
     ResumeThread(targetThread);
 
     Sleep(1000); // 1s
+    
+    // read the handle from parameters buf
 
-    // search for patterns in kernelmoduleunloader.exe process memory
+    UserPisParameters pisParameters2 = { 0 };
+    ReadProcessMemory(hTargetProcess, remoteShellcodeParamBuf, &pisParameters2, sizeof UserPisParameters, NULL);
 
-    utils::MEMORY_PATTERN* tmp_pattern = (utils::MEMORY_PATTERN*)utils::SearchProcessMemoryForPattern(
-        hTargetProcess,
-        pattern,
-        PAGE_READWRITE,
-        MEM_COMMIT,
-        MEM_PRIVATE
-    );
-
-    Log2("pattern: 0x%x, 0x%d, 0x%x", tmp_pattern->marks, tmp_pattern->handle, tmp_pattern->marks2);
-
-    if (tmp_pattern->marks == 0x12345678 && tmp_pattern->marks2 == 0x12345678) {
-        hDevice = (HANDLE)tmp_pattern->handle;
-    }
-
-    return hDevice;
+    return (HANDLE)pisParameters2.Handle;
 }
 
 HANDLE kdmapper_ce::GetDbk64DeviceHandle()

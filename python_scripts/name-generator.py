@@ -36,7 +36,8 @@ name = ["VirtualAlloc",
         "KeUnstackDetachProcess",
         "ObDereferenceObject",
         "MmMapLockedPagesSpecifyCache",
-        "DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = 0x%p"
+        "DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = 0x%p",
+        "CreateFileW Failed"
     ]
 for n in name:
     name_gen(n)

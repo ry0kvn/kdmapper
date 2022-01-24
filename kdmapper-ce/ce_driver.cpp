@@ -1,6 +1,7 @@
 #include "ce_driver.hpp"
 //char ce_driver::driver_name[100] = {};
 char ce_driver::driver_name[] = "EvilCEDRIVER73";
+char ce_driver::random_driver_name[100] = {};
 
 std::wstring ce_driver::GetDriverNameW() {
 	std::string t(ce_driver::driver_name);
@@ -28,29 +29,31 @@ BOOL ce_driver::Load() {
 	//}
 
 	//Randomize name for log in registry keys, usn jornal and other shits
-	/*
-	memset(ce_driver::driver_name, 0, sizeof(ce_driver::driver_name));
-	static const char alphanum[] =
-		"abcdefghijklmnopqrstuvwxyz"
-		"ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-	int len = rand() % 20 + 10;
-	for (int i = 0; i < len; ++i)
-		ce_driver::driver_name[i] = alphanum[rand() % (sizeof(alphanum) - 1)];
-	*/
-	Log("Loading provider driver: %s", ce_driver::driver_name);
+	
+	//memset(ce_driver::random_driver_name, 0, sizeof(ce_driver::random_driver_name));
+	//static const char alphanum[] =
+	//	"abcdefghijklmnopqrstuvwxyz"
+	//	"ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+	//int len = rand() % 20 + 10;
+	//for (int i = 0; i < len; ++i)
+	//	ce_driver::random_driver_name[i] = alphanum[rand() % (sizeof(alphanum) - 1)];
+	
+    Log("Loading provider driver: %s", ce_driver::driver_name);
 
 	std::wstring driver_path = GetDriverPath();
-	if (driver_path.empty()) {
+    
+    if (driver_path.empty()) {
 		Error("Can't find TEMP folder");
 		return result;
 	}
 
 	_wremove(driver_path.c_str());
 	
+
 #ifdef  _DEBUG
 
 	// self compiled dbk64.sys
-	driver_path.pop_back();
+	//driver_path.pop_back();
 	if (!utils::CreateFileFromMemory(driver_path, reinterpret_cast<const char*>(test_dbk64_driver_resource::driver), sizeof(test_dbk64_driver_resource::driver))) {
         Error("Failed to create vulnerable driver file");
 		return result;

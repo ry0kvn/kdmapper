@@ -35,8 +35,8 @@ namespace kdmapper_ce {
 	};
 
 	struct UserPisParameters {
-		PVOID Handle;
-		WCHAR symbol_name[MAX_PATH];
+		DWORD Handle;
+		WCHAR SymName[0x100];
 	};
 
 	extern PVOID64 pMmGetSystemRoutineAddress;

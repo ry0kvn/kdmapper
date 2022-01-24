@@ -27,6 +27,7 @@
 
 namespace ce_driver {
 	extern char driver_name[100] ; // dbk64.sys
+	extern char random_driver_name[100];
 
 	std::wstring GetDriverNameW();
 	std::wstring GetDriverPath();

@@ -191,7 +191,7 @@
     </Link>
     <PreBuildEvent>
       <Command>python.exe $(SolutionDir)python_scripts\PIC_generator.py $(OutDir)KernelPISCreator.sys $(ProjectDir) kernel_mode_shellcode .PIS
-python.exe $(SolutionDir)python_scripts\PIC_generator.py $(OutDir)KernelPISCreator.sys $(ProjectDir) kernel_mode_shellcode_ioctl .PIS2
+python.exe $(SolutionDir)python_scripts\PIC_generator.py $(OutDir)KernelPISCreator.sys $(ProjectDir) kernel_mode_ioctl_shellcode .PIS2
 python.exe $(SolutionDir)python_scripts\PIC_generator.py $(SolutionDir)Release\UserPISCreator.exe $(ProjectDir) shellcode .PIS</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -207,7 +207,8 @@ python.exe $(SolutionDir)python_scripts\PIC_generator.py $(SolutionDir)Release\U
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PreBuildEvent>
-      <Command>python.exe $(SolutionDir)shellcode\shellcode_generator.py $(SolutionDir)\Release\shellcode.exe $(ProjectDir) shellcode</Command>
+      <Command>
+      </Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

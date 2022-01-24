@@ -13,10 +13,10 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='experiments|x64'">
     <DebuggerFlavor>WindowsRemoteDebugger</DebuggerFlavor>
     <RemoteDebuggerCommand>C:\remotetmp\kdmapper-ce.exe</RemoteDebuggerCommand>
-    <RemoteDebuggerCommandArguments>HelloWorld.sys</RemoteDebuggerCommandArguments>
+    <RemoteDebuggerCommandArguments>dummy.sys</RemoteDebuggerCommandArguments>
     <RemoteDebuggerServerName>desktop-ud78o3i</RemoteDebuggerServerName>
     <DeploymentDirectory>C:\remotetmp</DeploymentDirectory>
-    <AdditionalFiles>$(SolutionDir)HelloWorld.sys</AdditionalFiles>
+    <AdditionalFiles>$(SolutionDir)dummy.sys</AdditionalFiles>
     <RemoteDebuggerDeployCppRuntime>true</RemoteDebuggerDeployCppRuntime>
     <RemoteDebuggerWorkingDirectory>C:\remotetmp</RemoteDebuggerWorkingDirectory>
   </PropertyGroup>

@@ -43,5 +43,4 @@ namespace utils {
 	HANDLE ReadFileToMemory(const wchar_t* driver_name);
 	bool CreateFileToTempFromResource(const wchar_t* file_name, const uint8_t resource_name[], size_t size);
 	HANDLE CreateKernelModuleUnloaderProcess();
-	LPVOID SearchProcessMemoryForPattern(HANDLE hProcess, MEMORY_PATTERN pattern, DWORD flProtect, DWORD flAllocationType, DWORD flType);
 }

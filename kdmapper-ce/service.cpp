@@ -2,8 +2,6 @@
 
 bool service::RegisterAndStart(const std::wstring& driver_path) {
 	const static DWORD ServiceTypeKernel = 1;
-	//const std::wstring driver_name = L"mydbk64";
-	//const std::wstring servicesPath = L"SYSTEM\\CurrentControlSet\\Services\\" + driver_name;
 	const std::wstring servicesPath = L"SYSTEM\\ControlSet001\\Services\\" +ce_driver::GetDriverNameW();
 	const std::wstring nPath = L"\\??\\" + driver_path;
 

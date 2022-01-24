@@ -11,13 +11,18 @@ typedef struct _HANDLE_MARKS {
     DWORD marks2;
 }HANDLE_MARKS;
 
+typedef struct _UserPisParameters {
+    DWORD Handle;
+    WCHAR SymName[100];
+}UserPisParameters;
+
 // function prototypes
 
 extern "C"
 void
 __declspec(safebuffers)
 __declspec(noinline)
-__stdcall PicStart();
+__stdcall PicStart(PVOID);
 #pragma alloc_text(".PIS", "PicStart")
 
 
