@@ -6,7 +6,7 @@
     <RemoteDebuggerCommandArguments>dummy.sys</RemoteDebuggerCommandArguments>
     <RemoteDebuggerServerName>desktop-ud78o3i</RemoteDebuggerServerName>
     <DeploymentDirectory>C:\remotetmp</DeploymentDirectory>
-    <AdditionalFiles>$(OutDir)\dummy.sys</AdditionalFiles>
+    <AdditionalFiles>$(OutDir)dummy.sys</AdditionalFiles>
     <RemoteDebuggerDeployCppRuntime>true</RemoteDebuggerDeployCppRuntime>
     <RemoteDebuggerWorkingDirectory>C:\remotetmp</RemoteDebuggerWorkingDirectory>
   </PropertyGroup>

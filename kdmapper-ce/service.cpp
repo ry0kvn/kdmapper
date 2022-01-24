@@ -103,9 +103,7 @@ bool service::RegisterAndStart(const std::wstring& driver_path) {
 	RtlInitUnicodeString(&serviceStr, wdriver_reg_path.c_str());
 
 	Status = NtLoadDriver(&serviceStr);
-#ifdef _DEBUG
 	Log2("NtLoadDriver Status 0x%x", Status);
-#endif // DEBUG
 
 	//Never should occur since kdmapper checks for "IsRunning" driver before
 	if (Status == 0xC000010E) {// STATUS_IMAGE_ALREADY_LOADED
@@ -150,9 +148,7 @@ bool service::StopAndRemove(const std::wstring& driver_name) {
 
 	if (st != 0x0) {
 
-#ifdef _DEBUG
 		Log2("NtUnloadDriver Status 0x%x", st);
-#endif // _DEBUG
 
 		Error("Driver Unload Failed!!");
 		status = RegDeleteKeyW(HKEY_LOCAL_MACHINE, servicesPath.c_str());

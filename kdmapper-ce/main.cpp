@@ -5,9 +5,7 @@ int wmain(const int argc, wchar_t** argv) {
 
 	utils::KdmapperInit();
 
-#if _DEBUG
 	Log2("Debug Mode Enable");
-#endif
 
 	wchar_t DriverFullPath[MAX_PATH] = { 0 };
 	const wchar_t* DriverName = argv[1];

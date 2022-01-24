@@ -79,9 +79,7 @@ HANDLE kdmapper_ce::GetDbk64DeviceHandleByInjection(HANDLE hTargetProcess) {
         MEM_PRIVATE
     );
 
-#ifdef _DEBUG
     Log2("pattern: 0x%x, 0x%d, 0x%x", tmp_pattern->marks, tmp_pattern->handle, tmp_pattern->marks2);
-#endif // DEBUG
 
     if (tmp_pattern->marks == 0x12345678 && tmp_pattern->marks2 == 0x12345678) {
         hDevice = (HANDLE)tmp_pattern->handle;
@@ -318,13 +316,13 @@ BOOL kdmapper_ce::ResolveImports(HANDLE hDevice, portable_executable::vec_import
         }*/
         for (auto& current_function_data : current_import.function_datas) {
             //uint64_t function_address = GetKernelModuleExport(hDevice, Module, current_function_data.name);
-            //TODO:
-            // ����ntoskrnl�̂ݑΉ�
+            //TODO: only ntoskrnl is supported
             std::wstring function_name(current_function_data.name.begin(), current_function_data.name.end());
             uint64_t function_address = (uint64_t)GetSystemProcAddress(hDevice, function_name.c_str());
 
             //uint64_t function_address = MmGetSystemRoutineAddress(hDevice, current_function_data.name);
             Log2("ResolveImports: import %ls (0x%p)", function_name.c_str(), function_address);
+
             //            if (!function_address) {
             //                //Lets try with ntoskrnl
             //                if (Module != ntoskrnlAddr) {

@@ -281,7 +281,7 @@ PVOID64 ce_driver::WriteNonPagedMemory(HANDLE hDevice, PVOID lpBuffer, SIZE_T nS
     }
 
     Log2("Shared memory for shellcode has been created in user space at 0x%p (MDL: 0x%p)", sharedBuf, Mdl);
-
+    
     // Write shellcode to shared memory
 
     memcpy((void*)sharedBuf, lpBuffer, nSize);
@@ -294,6 +294,6 @@ PVOID64 ce_driver::WriteNonPagedMemory(HANDLE hDevice, PVOID lpBuffer, SIZE_T nS
     }
 
     Log2("Successfully removed shared memory from user space...");
-
+    
     return (PVOID64)kernelShellcodeBuf;
 }

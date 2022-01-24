@@ -3,4 +3,7 @@
   <ItemGroup>
     <ClCompile Include="KernelPISCreator.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="KernelPISCreator.hpp" />
+  </ItemGroup>
 </Project>

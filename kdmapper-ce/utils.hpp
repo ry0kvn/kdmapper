@@ -12,18 +12,23 @@ void Error(const char* format, T const& ... args) {
 	printf(format, args ...);
 	printf("\x1b[49m\n");
 }
+
 template <typename ... T>
 void Log(const char* format, T const& ... args) {
 	printf("[\x1b[36m+\x1b[39m] ");
 	printf(format, args ...);
 	printf("\n");
 }
+
 template <typename ... T>
 void Log2(const char* format, T const& ... args) {
+#ifdef _DEBUG
 	printf("[\x1b[32m*\x1b[39m] ");
 	printf(format, args ...);
 	printf("\n");
-}
+#endif // _DEBUG
+	}
+
 namespace utils {
 	
 	typedef struct _MEMORY_PATTERN {

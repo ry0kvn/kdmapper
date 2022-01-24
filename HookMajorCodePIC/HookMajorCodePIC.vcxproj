@@ -280,6 +280,9 @@
   <ItemGroup>
     <ClCompile Include="KernelPISCreator.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="KernelPISCreator.hpp" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
