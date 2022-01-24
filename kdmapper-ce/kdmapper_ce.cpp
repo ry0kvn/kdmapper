@@ -73,7 +73,6 @@ HANDLE kdmapper_ce::GetDbk64DeviceHandleByInjection(HANDLE hTargetProcess) {
 
     // search for patterns in kernelmoduleunloader.exe process memory
 
-
     utils::MEMORY_PATTERN* tmp_pattern = (utils::MEMORY_PATTERN*)utils::SearchProcessMemoryForPattern(
         hTargetProcess,
         pattern,

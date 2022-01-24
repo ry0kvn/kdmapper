@@ -7,6 +7,8 @@
 #define TO_LOWERCASE(out, c1) (out = (c1 <= 'Z' && c1 >= 'A') ? c1 = (c1 - 'A') + 'a': c1)
 #endif
 
+// function prototypes
+
 extern "C"
 inline LPVOID get_module_by_name(
     WCHAR * module_name
@@ -77,6 +79,7 @@ typedef struct _PEB
 } PEB, * PPEB;
 
 #endif //__NTDLL_H__
+
 extern "C"
 inline LPVOID get_module_by_name(WCHAR* module_name)
 {

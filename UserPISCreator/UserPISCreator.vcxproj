@@ -207,10 +207,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp" />
+    <ClCompile Include="UserPISCreator.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="peb-lookup.hpp" />
+    <ClInclude Include="UserPISCreator.hpp" />
+    <ClInclude Include="PEB_LookUp.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

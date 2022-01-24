@@ -34,6 +34,11 @@ namespace kdmapper_ce {
 		USHORT dummy;
 	};
 
+	struct UserPisParameters {
+		PVOID Handle;
+		WCHAR symbol_name[MAX_PATH];
+	};
+
 	extern PVOID64 pMmGetSystemRoutineAddress;
 	extern PVOID64 pIofCompleteRequest;
 
