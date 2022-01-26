@@ -13,14 +13,12 @@ int wmain(const int argc, wchar_t** argv) {
 
 	Log2("Debug Mode Enable");
 
-	// コマンドライン引数に与えられたファイルをメモリにロード
+	// Load the file given as command line argument into memory.
 
 	if (argc < 2) {
 		Error("Usage: kdmapper-ce.exe <driver_path>");
 		return -1;
 	}
-
-	// reflectiveロードされるドライバのフルパスを取得
 
 	if (!_wfullpath(DriverFullPath, DriverName, MAX_PATH)) {
 		Error("_wfullpath failed");
@@ -33,7 +31,7 @@ int wmain(const int argc, wchar_t** argv) {
 		return -1;
 	}
 
-	// dbk64.sysファイルをディスクにドロップしサービスを作成，開始
+	// Drop the dbk64.sys file to disk with a random name to create and start the service.
 
 	if (!ce_driver::Load()) {
 		Error("ce_driver::Load() failed");
@@ -42,7 +40,7 @@ int wmain(const int argc, wchar_t** argv) {
 
 	do {
 
-		// kernelmoduleunloader.exe プロセスにシェルコードをインジェクトし，dbk64.sysのデバイスハンドルを取得
+		//  Inject shellcode into KernelModuleUnloader.exe process and get device handle of dbk64.sys
 
 		Log("Injecting shellcode into KernelModuleUnloader.exe process to get device handle of Dbk64.sys...");
 		
@@ -52,8 +50,8 @@ int wmain(const int argc, wchar_t** argv) {
 			break;
 		}
 
-		// Dbk64.sysのIRP_MJ_DEVICE_CONTROLにパッチを当て，
-		// ドライバをロードする代替コードでフックする
+		// Patch IRP_MJ_DEVICE_CONTROL in Dbk64.sys, and
+		// Hook it with alternate code to load the driver.
 		
 		Log("Patching IRP_MJ_DEVICE_CONTROL in Dbk64.sys driver to hook IRP...");
 		
@@ -61,11 +59,11 @@ int wmain(const int argc, wchar_t** argv) {
 			Error("kdmapper_ce::PatchMajorFunction failed");
 			break;
 		}
-
-		// TODO: 入力されたドライバのロード
 		
 		Log("Ready, load  the input driver...");
 		
+		// Reflective load of the input driver into kernel space.
+
 		if (!kdmapper_ce::MapDriver(dbk64_device_handle, hDriver, &exitCode)) {
 			Error("Failed to map %ls", DriverName);
 			break;
@@ -80,8 +78,8 @@ int wmain(const int argc, wchar_t** argv) {
 		
 	} while (FALSE);
 
+	// Stop and delete dbk64.sys service
 
-	// サービスの停止，削除
 	if (!service::StopAndRemove(ce_driver::GetDriverNameW())) {
 		Error("Failed to stop and remove service for the vulnerable driver");
 		_wremove(ce_driver::GetDriverPath().c_str());

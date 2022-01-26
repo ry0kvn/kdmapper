@@ -89,6 +89,7 @@ struct KernelPisParameters
 {
 	LPVOID MmGetSystemRoutineAddress;
 	LPVOID HookFunctionAddress;
+	WCHAR DriverObjectName[100];
 	USHORT dummy2;
 };
 

@@ -1,7 +1,5 @@
 #include "ce_driver.hpp"
-//char ce_driver::driver_name[100] = {};
-char ce_driver::driver_name[] = "EvilCEDRIVER73";
-char ce_driver::random_driver_name[100] = {};
+char ce_driver::driver_name[100] = {};
 
 std::wstring ce_driver::GetDriverNameW() {
 	std::string t(ce_driver::driver_name);
@@ -21,24 +19,18 @@ BOOL ce_driver::Load() {
 	BOOL result = FALSE;
 
 	srand((unsigned)time(NULL) * GetCurrentThreadId());
-	
-	// TODO: check the dbk64.sys service is already running.
-	//if (ce_driver::IsRunning()) {
-	//	Log2(L"[-] \\Device\\Nal is already in use." << std::endl);
-	//	return INVALID_HANDLE_VALUE;
-	//}
 
 	//Randomize name for log in registry keys, usn jornal and other shits
 	
-	//memset(ce_driver::random_driver_name, 0, sizeof(ce_driver::random_driver_name));
-	//static const char alphanum[] =
-	//	"abcdefghijklmnopqrstuvwxyz"
-	//	"ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-	//int len = rand() % 20 + 10;
-	//for (int i = 0; i < len; ++i)
-	//	ce_driver::random_driver_name[i] = alphanum[rand() % (sizeof(alphanum) - 1)];
+	memset(ce_driver::driver_name, 0, sizeof(ce_driver::driver_name));
+	static const char alphanum[] =
+		"abcdefghijklmnopqrstuvwxyz"
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+	int len = rand() % 20;
+	for (int i = 0; i < len; ++i)
+		ce_driver::driver_name[i] = alphanum[rand() % (sizeof(alphanum) - 1)];
 	
-    Log("Loading provider driver: %s", ce_driver::driver_name);
+    Log("Loading dbk64.sys driver: %s", ce_driver::driver_name);
 
 	std::wstring driver_path = GetDriverPath();
     
@@ -47,13 +39,10 @@ BOOL ce_driver::Load() {
 		return result;
 	}
 
-	_wremove(driver_path.c_str());
-	
 
 #ifdef  _DEBUG
 
 	// self compiled dbk64.sys
-	//driver_path.pop_back();
 	if (!utils::CreateFileFromMemory(driver_path, reinterpret_cast<const char*>(test_dbk64_driver_resource::driver), sizeof(test_dbk64_driver_resource::driver))) {
         Error("Failed to create vulnerable driver file");
 		return result;

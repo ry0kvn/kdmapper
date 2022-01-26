@@ -7,7 +7,6 @@ __declspec(noinline)
 __stdcall PicStart(PVOID StartContext)
 {
     
-    HANDLE_MARKS handle_marks = { 0x12345678, NULL, 0x12345678 };
     UserPisParameters* pisParameters = (UserPisParameters*)StartContext;
 
     // Init strings

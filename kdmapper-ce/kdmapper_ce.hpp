@@ -31,6 +31,7 @@ namespace kdmapper_ce {
 	{
 		LPVOID MmGetSystemRoutineAddress;
 		LPVOID HookFunctionAddress;
+		WCHAR DriverObjectName[100];
 		USHORT dummy;
 	};
 
@@ -47,7 +48,10 @@ namespace kdmapper_ce {
 	BOOL MapDriver(HANDLE, HANDLE, NTSTATUS*);
 	BOOL PatchMajorFunction(HANDLE);
 	BOOL ResolveImports(HANDLE hDevice, portable_executable::vec_imports imports);
-	PVOID Dbk64HookedDeviceIoControlTest(HANDLE, PCWSTR);
+
+	// IOCTLs
+
+	PVOID Dbk64HookedDeviceIoControlTest(HANDLE hDevice, PCWSTR);
 	UINT64 AllocateNonPagedMem(HANDLE hDevice, SIZE_T Size);
 	BOOL CreateSharedMemory(HANDLE hDevice, UINT64 kernelBuf, UINT64* sharedBuf, UINT64* Mdl, SIZE_T bufSize);
 	BOOL UnMapSharedMemory(HANDLE hDevice, UINT64 sharedMemAddress, UINT64 Mdl);

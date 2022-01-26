@@ -54,14 +54,14 @@ HANDLE kdmapper_ce::GetDbk64DeviceHandleByInjection(HANDLE hTargetProcess) {
 
     // hijack the main thread of kernelmoduleunloader
 
+    std::wstring symbol_name = L"\\\\.\\" + ce_driver::GetDriverNameW();
     WOW64_CONTEXT ct32 = { 0 };
     ct32.ContextFlags = CONTEXT_ALL;  // TODO
-    UserPisParameters pisParameters;
+    UserPisParameters pisParameters = { 0 };
+
     pisParameters.Handle = NULL;
-    wchar_t symbol_name[] = L"\\\\.\\EvilCEDRIVER73";
-
-    memcpy(pisParameters.SymName, symbol_name, sizeof symbol_name);
-
+    wcscpy_s(pisParameters.SymName, symbol_name.c_str());
+    
     // Allocate a buffer for shellcode parameters
 
     HANDLE remoteShellcodeParamBuf = VirtualAllocEx(hTargetProcess, NULL, sizeof UserPisParameters, (MEM_RESERVE | MEM_COMMIT), PAGE_READWRITE);
@@ -74,11 +74,11 @@ HANDLE kdmapper_ce::GetDbk64DeviceHandleByInjection(HANDLE hTargetProcess) {
 
     WriteProcessMemory(hTargetProcess, remoteShellcodeParamBuf, &pisParameters, sizeof UserPisParameters, NULL);
 
-    // Set Eip to the address of the parameter. 
-    // Set Eip to the address of the shellcode.
-
     Wow64SuspendThread(targetThread);
     Wow64GetThreadContext(targetThread, &ct32);
+
+    // Set Eip to the address of the parameter. 
+    // Set Eip to the address of the shellcode.
 
     ct32.Ecx = (DWORD)remoteShellcodeParamBuf;
     ct32.Eip = (DWORD)remoteShellcodeBuffer;
@@ -90,10 +90,13 @@ HANDLE kdmapper_ce::GetDbk64DeviceHandleByInjection(HANDLE hTargetProcess) {
     
     // read the handle from parameters buf
 
-    UserPisParameters pisParameters2 = { 0 };
-    ReadProcessMemory(hTargetProcess, remoteShellcodeParamBuf, &pisParameters2, sizeof UserPisParameters, NULL);
+    ReadProcessMemory(hTargetProcess, remoteShellcodeParamBuf, &pisParameters, sizeof UserPisParameters, NULL);
+    
+    if (pisParameters.Handle == NULL) {
+        return INVALID_HANDLE_VALUE;
+    }
 
-    return (HANDLE)pisParameters2.Handle;
+    return (HANDLE)pisParameters.Handle;
 }
 
 HANDLE kdmapper_ce::GetDbk64DeviceHandle()
@@ -293,9 +296,10 @@ BOOL kdmapper_ce::PatchMajorFunction(HANDLE dbk64_device_handle)
         }
 
         // Place PIC arguments in kernel space
-
+        std::wstring DriverObjectName = L"\\Driver\\" + ce_driver::GetDriverNameW();
         pisParameters.MmGetSystemRoutineAddress = kdmapper_ce::pMmGetSystemRoutineAddress;
         pisParameters.HookFunctionAddress = (LPVOID)ioctlShellcodeBuf;
+        wcscpy_s(pisParameters.DriverObjectName, DriverObjectName.c_str());
         pisParameters.dummy = NULL;
 
         kernelParamAddr = ce_driver::WriteNonPagedMemory(dbk64_device_handle, &pisParameters, sizeof(KernelPisParameters));

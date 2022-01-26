@@ -190,9 +190,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PreBuildEvent>
-      <Command>python.exe $(SolutionDir)python_scripts\PIC_generator.py $(OutDir)KernelPISCreator.sys $(ProjectDir) kernel_mode_shellcode .PIS
-python.exe $(SolutionDir)python_scripts\PIC_generator.py $(OutDir)KernelPISCreator.sys $(ProjectDir) kernel_mode_ioctl_shellcode .PIS2
-python.exe $(SolutionDir)python_scripts\PIC_generator.py $(SolutionDir)Release\UserPISCreator.exe $(ProjectDir) shellcode .PIS</Command>
+      <Command>python.exe $(SolutionDir)python_scripts\PIC_generator.py $(SolutionDir)x64\Release\KernelPISCreator.sys $(ProjectDir) kernel_mode_shellcode .PIS
+python.exe $(SolutionDir)python_scripts\PIC_generator.py $(SolutionDir)x64\Release\KernelPISCreator.sys $(ProjectDir) kernel_mode_ioctl_shellcode .PIS2</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='experiments|x64'">
